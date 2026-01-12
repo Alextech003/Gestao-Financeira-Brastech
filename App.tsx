@@ -56,7 +56,13 @@ function App() {
     if (!isAuthenticated || transactions.length === 0) return;
 
     const checkLate = async () => {
-        const today = new Date().toISOString().split('T')[0];
+        // Use local date for comparison to match user's wall clock
+        const d = new Date();
+        const today = [
+            d.getFullYear(),
+            String(d.getMonth() + 1).padStart(2, '0'),
+            String(d.getDate()).padStart(2, '0')
+        ].join('-');
         
         // Find items that need update locally first to avoid infinite loops
         const toUpdate = transactions.filter(t => 

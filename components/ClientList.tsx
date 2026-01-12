@@ -17,8 +17,18 @@ export const ClientList: React.FC<ClientListProps> = ({
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
+  // Helper to get local date YYYY-MM-DD
+  const getLocalToday = () => {
+    const d = new Date();
+    return [
+      d.getFullYear(),
+      String(d.getMonth() + 1).padStart(2, '0'),
+      String(d.getDate()).padStart(2, '0')
+    ].join('-');
+  };
+
   const [newClient, setNewClient] = useState<Omit<Client, 'id'>>({
-    registrationDate: new Date().toISOString().split('T')[0],
+    registrationDate: getLocalToday(),
     name: '',
     phone: '',
     cpf: '',
@@ -52,7 +62,7 @@ export const ClientList: React.FC<ClientListProps> = ({
     setEditingId(null);
     setShowForm(false);
     setNewClient({
-        registrationDate: new Date().toISOString().split('T')[0],
+        registrationDate: getLocalToday(),
         name: '',
         phone: '',
         cpf: '',
@@ -99,6 +109,15 @@ export const ClientList: React.FC<ClientListProps> = ({
 
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
+  // Helper para formatar data completa na tabela (dd/mm/aaaa) sem problema de timezone
+  const formatFullDate = (dateStr: string) => {
+      if (!dateStr) return '-';
+      const parts = dateStr.split('-');
+      // new Date(year, monthIndex, day) creates date in local time
+      const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      return date.toLocaleDateString('pt-BR');
+  };
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
@@ -230,7 +249,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                 {clients.map(c => (
                     <tr key={c.id} className="group hover:bg-blue-50/30 transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                            {new Date(c.registrationDate).toLocaleDateString('pt-BR')}
+                            {formatFullDate(c.registrationDate)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex flex-col">

@@ -21,7 +21,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     // 1. Filtrar pelo tipo e Ordenar decrescente (data mais nova em cima)
     const sorted = transactions
       .filter(t => t.type === type)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      .sort((a, b) => b.date.localeCompare(a.date)); // String comparison is safer for YYYY-MM-DD
 
     // 2. Agrupar
     const groups: { date: string; items: Transaction[] }[] = [];
@@ -43,9 +43,19 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   
   const isEntry = type === 'ENTRADA';
   
+  // Helper para obter data local YYYY-MM-DD
+  const getLocalToday = () => {
+    const d = new Date();
+    return [
+      d.getFullYear(),
+      String(d.getMonth() + 1).padStart(2, '0'),
+      String(d.getDate()).padStart(2, '0')
+    ].join('-');
+  };
+
   // New transaction state
   const [newTrans, setNewTrans] = useState<Partial<Transaction>>({
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalToday(),
     description: '',
     entity: '',
     amount: 0,
@@ -75,7 +85,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     setEditingId(null);
     setShowForm(false);
     setNewTrans({
-      date: new Date().toISOString().split('T')[0],
+      date: getLocalToday(),
       description: '',
       entity: '',
       amount: 0,
@@ -94,7 +104,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
 
         // Se for Contas a Pagar (SAIDA) e NÃO tiver data de pagamento preenchida
         if (!isEntry && !prev.paymentDate) {
-            const today = new Date().toISOString().split('T')[0];
+            const today = getLocalToday();
             // Se a nova data de vencimento for menor que hoje -> ATRASADO, senão -> PENDENTE
             updated.status = date < today ? 'ATRASADO' : 'PENDENTE';
         }
@@ -112,7 +122,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
         } else {
             // Se limpou a data de pagamento -> Recalcula com base no vencimento
             setNewTrans(prev => {
-                const today = new Date().toISOString().split('T')[0];
+                const today = getLocalToday();
                 const dueDate = prev.date || today;
                 const newStatus = dueDate < today ? 'ATRASADO' : 'PENDENTE';
                 return { ...prev, paymentDate: date, status: newStatus };
@@ -139,7 +149,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
           newStatus = 'PAGO';
       } else {
           // Se tirou data -> Verifica vencimento
-          const today = new Date().toISOString().split('T')[0];
+          const today = getLocalToday();
           if (t.date < today) {
               newStatus = 'ATRASADO';
           } else {
@@ -202,11 +212,29 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     }
   };
 
-  // Helper para formatar data do separador
+  // Helper para formatar data do separador (Corrigido para evitar timezone UTC)
   const formatHeaderDate = (dateStr: string) => {
+      if (!dateStr) return '-';
       const parts = dateStr.split('-');
+      // Cria a data localmente usando o construtor (Ano, Mês-1, Dia)
       const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
       return date.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  };
+
+  // Helper para formatar data curta na tabela (dd/mm) - Sem Timezone issue
+  const formatShortDate = (dateStr: string) => {
+      if (!dateStr) return '-';
+      const parts = dateStr.split('-');
+      const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      return date.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'});
+  };
+  
+  // Helper para formatar data completa na tabela (dd/mm/aaaa)
+  const formatFullDate = (dateStr: string) => {
+      if (!dateStr) return '-';
+      const parts = dateStr.split('-');
+      const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      return date.toLocaleDateString('pt-BR');
   };
 
   return (
@@ -445,8 +473,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                             // Row for Contas a Receber
                             <>
                                 <td className="px-3 py-2 whitespace-nowrap text-xs text-slate-400">
-                                    {/* Data repetida visualmente mais fraca, já que temos o header */}
-                                    {new Date(t.date).toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})}
+                                    {formatShortDate(t.date)}
                                 </td>
                                 <td className="px-3 py-2 whitespace-nowrap text-sm font-bold text-slate-800">
                                     {t.entity}
@@ -484,7 +511,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                             // Row for Contas a Pagar
                             <>
                                 <td className="px-3 py-2 whitespace-nowrap text-xs text-slate-400">
-                                    {new Date(t.date).toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})}
+                                    {formatShortDate(t.date)}
                                 </td>
                                 <td className="px-3 py-2 whitespace-nowrap text-sm font-bold text-slate-800">
                                     {t.entity}
@@ -521,7 +548,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                                     <div className="flex items-center justify-center">
                                         {readOnly ? (
                                             <span className={`text-xs ${t.paymentDate ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>
-                                                {t.paymentDate ? new Date(t.paymentDate).toLocaleDateString('pt-BR') : '-'}
+                                                {formatFullDate(t.paymentDate || '')}
                                             </span>
                                         ) : (
                                             <div className={`relative flex items-center justify-center gap-1 px-1 py-1 rounded-lg border transition-all ${t.paymentDate ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-slate-200 bg-white text-slate-400 hover:border-slate-300'}`}>

@@ -152,7 +152,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
           </div>
 
           {/* Entradas Summary Table */}
-          <Card className="!p-0 border-none overflow-hidden" headerColor="bg-gradient-to-r from-green-600 to-emerald-500" title={`Entradas (${months[selectedMonth]})`} centerTitle>
+          <Card className="!p-0 border-none overflow-hidden" headerColor="bg-gradient-to-r from-green-600 to-emerald-500" title="Entradas" centerTitle>
             <div className="divide-y divide-slate-100 bg-white">
               <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
                   {Object.entries(monthData.incomeByCategory).map(([cat, val]) => (
@@ -173,7 +173,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
           </Card>
 
            {/* Despesas Summary Table */}
-           <Card className="!p-0 border-none overflow-hidden" headerColor="bg-gradient-to-r from-red-600 to-rose-500" title={`Despesas (${months[selectedMonth]})`} centerTitle>
+           <Card className="!p-0 border-none overflow-hidden" headerColor="bg-gradient-to-r from-red-600 to-rose-500" title="Despesas" centerTitle>
             <div className="divide-y divide-slate-100 bg-white">
               <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
                   {Object.entries(monthData.expenseByCategory).map(([cat, val]) => (
