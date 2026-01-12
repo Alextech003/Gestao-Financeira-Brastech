@@ -4,14 +4,14 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area 
 } from 'recharts';
 import { Card } from './ui/Card';
-import { Calendar, ChevronDown } from 'lucide-react';
+import { Calendar, ChevronDown, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 
 interface DashboardProps {
   transactions: Transaction[];
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
-  // Inicializa com o ano e mês atuais para mostrar dados relevantes imediatamente
+  // Inicializa com o ano e mês atuais
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
 
@@ -19,55 +19,66 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
     'JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'
   ];
 
-  // Calculate Yearly Data for Chart & Bottom Table
+  // Helper para extrair Ano e Mês sem sofrer com Fuso Horário (Timezone)
+  const getTransactionDate = (dateStr: string) => {
+    try {
+        if (!dateStr) return { year: 0, month: -1 };
+        
+        // Se for formato ISO ou YYYY-MM-DD (padrão do input type="date")
+        if (dateStr.includes('-')) {
+            const cleanDate = dateStr.split('T')[0]; // Remove hora se houver
+            const parts = cleanDate.split('-');
+            const year = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1; // Mês 0-indexado
+            return { year, month };
+        }
+        
+        // Fallback para outros formatos
+        const d = new Date(dateStr);
+        return { year: d.getFullYear(), month: d.getMonth() };
+    } catch (e) {
+        return { year: 0, month: -1 };
+    }
+  };
+
+  // Cálculo dos dados anuais (Gráfico e Tabela Inferior)
   const yearlyData = useMemo(() => {
+    // Cria estrutura base zerada para os 12 meses
     const data = Array(12).fill(0).map((_, idx) => ({
       name: months[idx],
       index: idx,
       Entrada: 0,
       Saida: 0,
-      Saldo: 0,
-      Balanco: 0
+      Saldo: 0
     }));
 
     transactions.forEach(t => {
-      // Parse YYYY-MM-DD manually to avoid timezone shifts
-      let year, month;
+      const { year, month } = getTransactionDate(t.date);
       
-      try {
-        if (typeof t.date === 'string' && t.date.includes('-')) {
-            const parts = t.date.split('T')[0].split('-'); // Handle both YYYY-MM-DD and ISO
-            year = parseInt(parts[0], 10);
-            month = parseInt(parts[1], 10) - 1; // 0-indexed for array access
-        } else {
-             const d = new Date(t.date);
-             year = d.getFullYear();
-             month = d.getMonth();
-        }
+      // Garante que amount é número
+      const amount = Number(t.amount) || 0;
 
-        if (year === selectedYear) {
-            // Removida a restrição 'PAGO'. Agora mostra previsão total (Competência)
-            if (t.type === 'ENTRADA') {
-                data[month].Entrada += t.amount;
-            } else if (t.type === 'SAIDA') {
-                data[month].Saida += t.amount;
-            }
-        }
-      } catch (e) {
-          console.error("Error parsing date for transaction", t);
+      if (year === selectedYear && month >= 0 && month <= 11) {
+          // Normaliza o tipo para garantir match
+          const type = t.type?.toUpperCase();
+          
+          if (type === 'ENTRADA') {
+              data[month].Entrada += amount;
+          } else if (type === 'SAIDA') {
+              data[month].Saida += amount;
+          }
       }
     });
 
-    // Calculate balances
+    // Calcula saldos finais
     data.forEach(m => {
       m.Saldo = m.Entrada - m.Saida;
-      m.Balanco = m.Saldo; 
     });
 
     return data;
   }, [transactions, selectedYear]);
 
-  // Calculate Selected Month Data for Side Tables
+  // Cálculo dos dados do Mês Selecionado (Resumo Lateral)
   const monthData = useMemo(() => {
     const incomeByCategory: Record<string, number> = {};
     const expenseByCategory: Record<string, number> = {};
@@ -75,30 +86,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
     let totalExpense = 0;
 
     transactions.forEach(t => {
-       let year, month;
-       try {
-            if (typeof t.date === 'string' && t.date.includes('-')) {
-                const parts = t.date.split('T')[0].split('-');
-                year = parseInt(parts[0], 10);
-                month = parseInt(parts[1], 10) - 1;
-            } else {
-                const d = new Date(t.date);
-                year = d.getFullYear();
-                month = d.getMonth();
-            }
+       const { year, month } = getTransactionDate(t.date);
+       const amount = Number(t.amount) || 0;
 
-            if (year === selectedYear && month === selectedMonth) {
-                // Inclui todas as transações do mês selecionado (Pagas e Pendentes)
-                if (t.type === 'ENTRADA') {
-                    incomeByCategory[t.category] = (incomeByCategory[t.category] || 0) + t.amount;
-                    totalIncome += t.amount;
-                } else if (t.type === 'SAIDA') {
-                    expenseByCategory[t.category] = (expenseByCategory[t.category] || 0) + t.amount;
-                    totalExpense += t.amount;
-                }
+       if (year === selectedYear && month === selectedMonth) {
+            const type = t.type?.toUpperCase();
+            const category = t.category || 'Geral';
+
+            if (type === 'ENTRADA') {
+                incomeByCategory[category] = (incomeByCategory[category] || 0) + amount;
+                totalIncome += amount;
+            } else if (type === 'SAIDA') {
+                expenseByCategory[category] = (expenseByCategory[category] || 0) + amount;
+                totalExpense += amount;
             }
-       } catch (e) {
-           // ignore bad dates
        }
     });
 
@@ -128,7 +129,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
                   onChange={(e) => setSelectedYear(Number(e.target.value))}
                   className="w-full bg-slate-50 text-slate-800 font-bold rounded-xl pl-10 pr-8 py-3 appearance-none border-2 border-transparent focus:border-blue-500 outline-none cursor-pointer transition-colors hover:bg-blue-50"
                 >
-                  {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+                  {/* Gera lista de anos dinamicamente baseada nos dados ou padrão */}
+                  {[2023, 2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
                     <ChevronDown size={16} />
@@ -150,17 +152,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
           </div>
 
           {/* Entradas Summary Table */}
-          <Card className="!p-0 border-none" headerColor="bg-gradient-to-r from-green-600 to-emerald-500" title="Entradas (Previsto)" centerTitle>
+          <Card className="!p-0 border-none overflow-hidden" headerColor="bg-gradient-to-r from-green-600 to-emerald-500" title={`Entradas (${months[selectedMonth]})`} centerTitle>
             <div className="divide-y divide-slate-100 bg-white">
-              {Object.entries(monthData.incomeByCategory).map(([cat, val]) => (
-                <div key={cat} className="flex justify-between px-6 py-3 text-sm hover:bg-green-50/50 transition-colors">
-                  <span className="font-semibold text-slate-600">{cat}</span>
-                  <span className="font-bold text-green-700">{formatCurrency(val as number)}</span>
-                </div>
-              ))}
-              {Object.keys(monthData.incomeByCategory).length === 0 && (
-                 <div className="p-6 text-center text-slate-400 text-xs italic">Nenhum recebimento este mês</div>
-              )}
+              <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
+                  {Object.entries(monthData.incomeByCategory).map(([cat, val]) => (
+                    <div key={cat} className="flex justify-between px-6 py-3 text-sm hover:bg-green-50/50 transition-colors">
+                      <span className="font-semibold text-slate-600 truncate mr-2">{cat}</span>
+                      <span className="font-bold text-green-700 whitespace-nowrap">{formatCurrency(val as number)}</span>
+                    </div>
+                  ))}
+                  {Object.keys(monthData.incomeByCategory).length === 0 && (
+                     <div className="p-6 text-center text-slate-400 text-xs italic">Nenhum recebimento este mês</div>
+                  )}
+              </div>
               <div className="flex justify-between px-6 py-4 bg-green-50/80 font-black border-t border-green-100 text-green-800">
                 <span>TOTAL</span>
                 <span>{formatCurrency(monthData.totalIncome)}</span>
@@ -169,17 +173,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
           </Card>
 
            {/* Despesas Summary Table */}
-           <Card className="!p-0 border-none" headerColor="bg-gradient-to-r from-red-600 to-rose-500" title="Despesas (Previsto)" centerTitle>
+           <Card className="!p-0 border-none overflow-hidden" headerColor="bg-gradient-to-r from-red-600 to-rose-500" title={`Despesas (${months[selectedMonth]})`} centerTitle>
             <div className="divide-y divide-slate-100 bg-white">
-              {Object.entries(monthData.expenseByCategory).map(([cat, val]) => (
-                <div key={cat} className="flex justify-between px-6 py-3 text-sm hover:bg-red-50/50 transition-colors">
-                  <span className="font-semibold text-slate-600">{cat}</span>
-                  <span className="font-bold text-red-700">{formatCurrency(val as number)}</span>
-                </div>
-              ))}
-               {Object.keys(monthData.expenseByCategory).length === 0 && (
-                 <div className="p-6 text-center text-slate-400 text-xs italic">Nenhum pagamento este mês</div>
-              )}
+              <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
+                  {Object.entries(monthData.expenseByCategory).map(([cat, val]) => (
+                    <div key={cat} className="flex justify-between px-6 py-3 text-sm hover:bg-red-50/50 transition-colors">
+                      <span className="font-semibold text-slate-600 truncate mr-2">{cat}</span>
+                      <span className="font-bold text-red-700 whitespace-nowrap">{formatCurrency(val as number)}</span>
+                    </div>
+                  ))}
+                   {Object.keys(monthData.expenseByCategory).length === 0 && (
+                     <div className="p-6 text-center text-slate-400 text-xs italic">Nenhum pagamento este mês</div>
+                  )}
+              </div>
               <div className="flex justify-between px-6 py-4 bg-red-50/80 font-black border-t border-red-100 text-red-800">
                 <span>TOTAL</span>
                 <span>{formatCurrency(monthData.totalExpense)}</span>
@@ -192,19 +198,34 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
         {/* Right Side: Chart */}
         <div className="lg:col-span-9">
           <Card className="h-full min-h-[450px] relative flex flex-col">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
                 <div className="flex items-center gap-3">
                     <div className="w-1.5 h-8 bg-gradient-to-b from-blue-500 to-blue-700 rounded-full"></div>
-                    <h2 className="text-2xl font-bold text-slate-800">Fluxo Financeiro (Geral)</h2>
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800">Fluxo Financeiro</h2>
+                        <p className="text-xs text-slate-400 font-medium">Análise de Entradas e Saídas (Previsto + Realizado)</p>
+                    </div>
                 </div>
-                <div className="px-4 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-bold border border-blue-100">
-                    {selectedYear}
+                
+                {/* Mini Summary Chips for the Year */}
+                <div className="flex gap-3 text-xs font-bold">
+                    <div className="px-4 py-2 rounded-xl bg-green-50 text-green-700 border border-green-100 flex items-center gap-2">
+                        <TrendingUp size={14} />
+                        {formatCurrency(yearlyData.reduce((acc, curr) => acc + curr.Entrada, 0))}
+                    </div>
+                    <div className="px-4 py-2 rounded-xl bg-red-50 text-red-700 border border-red-100 flex items-center gap-2">
+                        <TrendingDown size={14} />
+                        {formatCurrency(yearlyData.reduce((acc, curr) => acc + curr.Saida, 0))}
+                    </div>
+                     <div className="px-4 py-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 flex items-center gap-2">
+                        {selectedYear}
+                    </div>
                 </div>
             </div>
             
             <div className="flex-1 w-full min-h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={yearlyData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
+                <AreaChart data={yearlyData} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
                     <defs>
                     <linearGradient id="colorEntrada" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#16a34a" stopOpacity={0.6}/>
@@ -221,10 +242,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
                     <Tooltip 
                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
                         formatter={(value) => formatCurrency(Number(value))} 
+                        labelStyle={{ color: '#1e293b', fontWeight: 'bold' }}
                     />
                     <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }}/>
-                    <Area type="monotone" name="Entradas" dataKey="Entrada" stroke="#16a34a" strokeWidth={3} fillOpacity={1} fill="url(#colorEntrada)" />
-                    <Area type="monotone" name="Despesas" dataKey="Saida" stroke="#dc2626" strokeWidth={3} fillOpacity={1} fill="url(#colorSaida)" />
+                    <Area type="monotone" name="Entradas" dataKey="Entrada" stroke="#16a34a" strokeWidth={3} fillOpacity={1} fill="url(#colorEntrada)" animationDuration={1000} />
+                    <Area type="monotone" name="Despesas" dataKey="Saida" stroke="#dc2626" strokeWidth={3} fillOpacity={1} fill="url(#colorSaida)" animationDuration={1000} />
                 </AreaChart>
                 </ResponsiveContainer>
             </div>
