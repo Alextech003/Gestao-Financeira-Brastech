@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Transaction, TransactionType, PayerOption, TransactionStatus } from '../types';
 import { CheckCircle2, Clock, AlertCircle, Plus, Trash2, Edit, Calendar, DollarSign, Tag, User, FileText, UserCheck, Lock } from 'lucide-react';
 import { Card } from './ui/Card';
@@ -16,7 +16,28 @@ interface TransactionListProps {
 export const TransactionList: React.FC<TransactionListProps> = ({ 
   type, transactions, onAddTransaction, onUpdateTransaction, onUpdateStatus, onDelete, readOnly = false
 }) => {
-  const filteredTransactions = transactions.filter(t => t.type === type);
+  // Ordenar (Mais novos primeiro) e Agrupar por dia
+  const groupedTransactions = useMemo(() => {
+    // 1. Filtrar pelo tipo e Ordenar decrescente (data mais nova em cima)
+    const sorted = transactions
+      .filter(t => t.type === type)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // 2. Agrupar
+    const groups: { date: string; items: Transaction[] }[] = [];
+    
+    sorted.forEach(t => {
+      const lastGroup = groups[groups.length - 1];
+      if (lastGroup && lastGroup.date === t.date) {
+        lastGroup.items.push(t);
+      } else {
+        groups.push({ date: t.date, items: [t] });
+      }
+    });
+
+    return groups;
+  }, [transactions, type]);
+
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
@@ -65,9 +86,38 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     });
   };
 
+  // Lógica Automática: Mudança na Data de Vencimento
+  const handleDueDateChange = (date: string) => {
+    // Atualiza a data no estado
+    setNewTrans(prev => {
+        const updated = { ...prev, date: date };
+
+        // Se for Contas a Pagar (SAIDA) e NÃO tiver data de pagamento preenchida
+        if (!isEntry && !prev.paymentDate) {
+            const today = new Date().toISOString().split('T')[0];
+            // Se a nova data de vencimento for menor que hoje -> ATRASADO, senão -> PENDENTE
+            updated.status = date < today ? 'ATRASADO' : 'PENDENTE';
+        }
+        
+        return updated;
+    });
+  };
+
+  // Lógica Automática: Mudança na Data de Pagamento
   const handlePaymentDateChange = (date: string) => {
-    if (!isEntry && date) {
-        setNewTrans(prev => ({ ...prev, paymentDate: date, status: 'PAGO' }));
+    if (!isEntry) {
+        if (date) {
+            // Se preencheu data de pagamento -> PAGO
+            setNewTrans(prev => ({ ...prev, paymentDate: date, status: 'PAGO' }));
+        } else {
+            // Se limpou a data de pagamento -> Recalcula com base no vencimento
+            setNewTrans(prev => {
+                const today = new Date().toISOString().split('T')[0];
+                const dueDate = prev.date || today;
+                const newStatus = dueDate < today ? 'ATRASADO' : 'PENDENTE';
+                return { ...prev, paymentDate: date, status: newStatus };
+            });
+        }
     } else {
         setNewTrans(prev => ({ ...prev, paymentDate: date }));
     }
@@ -85,8 +135,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({
       let newStatus: TransactionStatus = t.status;
       
       if (newDate) {
+          // Se colocou data -> PAGO
           newStatus = 'PAGO';
       } else {
+          // Se tirou data -> Verifica vencimento
           const today = new Date().toISOString().split('T')[0];
           if (t.date < today) {
               newStatus = 'ATRASADO';
@@ -150,6 +202,13 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     }
   };
 
+  // Helper para formatar data do separador
+  const formatHeaderDate = (dateStr: string) => {
+      const parts = dateStr.split('-');
+      const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      return date.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  };
+
   return (
     <div className="space-y-6 animate-fade-in pb-10">
       
@@ -201,7 +260,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                   type="date" 
                   className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" 
                   value={newTrans.date} 
-                  onChange={e => setNewTrans({...newTrans, date: e.target.value})} 
+                  onChange={e => handleDueDateChange(e.target.value)} 
                 />
             </div>
 
@@ -349,7 +408,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                         <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider first:rounded-tl-2xl">Data</th>
                         <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider">Remetente</th>
                         <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider">Valor</th>
-                        <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider">Descrição</th>
+                        <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider w-1/3">Descrição</th>
                         <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider">Status</th>
                         {!readOnly && <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider last:rounded-tr-2xl">Ações</th>}
                     </>
@@ -358,10 +417,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                     <>
                         <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider first:rounded-tl-2xl">Vencimento</th>
                         <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider">Destinatário</th>
-                        <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider">Descrição</th>
+                        <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider w-1/3">Descrição</th>
                         <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider">Valor</th>
                         <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider">Status</th>
-                        <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider">Pago Em</th>
+                        <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider">Data de Pagamento</th>
                         <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider">Quem</th>
                         {!readOnly && <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider last:rounded-tr-2xl">Ações</th>}
                     </>
@@ -369,144 +428,158 @@ export const TransactionList: React.FC<TransactionListProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filteredTransactions.map((t) => (
-                <tr key={t.id} className="group hover:bg-blue-50/30 transition-colors duration-200">
-                  
-                  {isEntry ? (
-                    // Row for Contas a Receber
-                    <>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs text-slate-600">
-                             {new Date(t.date).toLocaleDateString('pt-BR')}
+              {groupedTransactions.map((group) => (
+                <React.Fragment key={group.date}>
+                    {/* Linha Separadora de Data */}
+                    <tr className="bg-slate-50/80 border-b border-slate-100">
+                        <td colSpan={10} className="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wide">
+                            {formatHeaderDate(group.date)}
                         </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-sm font-bold text-slate-800">
-                            {t.entity}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-sm font-bold text-green-700">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.amount)}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs text-slate-500 max-w-[150px] truncate">
-                            {t.description}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-center">
-                            {readOnly ? (
-                                <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusColor(t.status)}`}>
-                                    {t.status}
-                                </span>
-                            ) : (
-                                <div className="relative inline-block">
-                                    <select 
-                                        value={t.status}
-                                        onChange={(e) => onUpdateStatus(t.id, e.target.value as TransactionStatus)}
-                                        className={`appearance-none cursor-pointer pl-2 pr-6 py-0.5 rounded-full text-[10px] font-bold border focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-400 ${getStatusColor(t.status)}`}
-                                    >
-                                        <option value="AGUARDANDO">Aguardando</option>
-                                        <option value="PAGO">Pago</option>
-                                        <option value="ATRASADO">Atrasado</option>
-                                    </select>
-                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-current opacity-60">
-                                        <svg className="fill-current h-2 w-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                    </tr>
+                    
+                    {/* Itens do grupo */}
+                    {group.items.map(t => (
+                        <tr key={t.id} className="group hover:bg-blue-50/30 transition-colors duration-200">
+                        
+                        {isEntry ? (
+                            // Row for Contas a Receber
+                            <>
+                                <td className="px-3 py-2 whitespace-nowrap text-xs text-slate-400">
+                                    {/* Data repetida visualmente mais fraca, já que temos o header */}
+                                    {new Date(t.date).toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})}
+                                </td>
+                                <td className="px-3 py-2 whitespace-nowrap text-sm font-bold text-slate-800">
+                                    {t.entity}
+                                </td>
+                                <td className="px-3 py-2 whitespace-nowrap text-sm font-bold text-green-700">
+                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.amount)}
+                                </td>
+                                <td className="px-3 py-2 text-xs text-slate-500 whitespace-normal break-words">
+                                    {t.description}
+                                </td>
+                                <td className="px-3 py-2 whitespace-nowrap text-center">
+                                    {readOnly ? (
+                                        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusColor(t.status)}`}>
+                                            {t.status}
+                                        </span>
+                                    ) : (
+                                        <div className="relative inline-block">
+                                            <select 
+                                                value={t.status}
+                                                onChange={(e) => onUpdateStatus(t.id, e.target.value as TransactionStatus)}
+                                                className={`appearance-none cursor-pointer pl-2 pr-6 py-0.5 rounded-full text-[10px] font-bold border focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-400 ${getStatusColor(t.status)}`}
+                                            >
+                                                <option value="AGUARDANDO">Aguardando</option>
+                                                <option value="PAGO">Pago</option>
+                                                <option value="ATRASADO">Atrasado</option>
+                                            </select>
+                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-current opacity-60">
+                                                <svg className="fill-current h-2 w-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                                            </div>
+                                        </div>
+                                    )}
+                                </td>
+                            </>
+                        ) : (
+                            // Row for Contas a Pagar
+                            <>
+                                <td className="px-3 py-2 whitespace-nowrap text-xs text-slate-400">
+                                    {new Date(t.date).toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})}
+                                </td>
+                                <td className="px-3 py-2 whitespace-nowrap text-sm font-bold text-slate-800">
+                                    {t.entity}
+                                </td>
+                                <td className="px-3 py-2 text-xs text-slate-500 whitespace-normal break-words">
+                                    {t.description}
+                                </td>
+                                <td className="px-3 py-2 whitespace-nowrap text-sm font-bold text-red-700">
+                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.amount)}
+                                </td>
+                                <td className="px-3 py-2 whitespace-nowrap text-center">
+                                    {readOnly ? (
+                                        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusColor(t.status)}`}>
+                                            {t.status}
+                                        </span>
+                                    ) : (
+                                        <div className="relative inline-block">
+                                            <select 
+                                                value={t.status}
+                                                onChange={(e) => onUpdateStatus(t.id, e.target.value as TransactionStatus)}
+                                                className={`appearance-none cursor-pointer pl-2 pr-6 py-0.5 rounded-full text-[10px] font-bold border focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-400 ${getStatusColor(t.status)}`}
+                                            >
+                                                <option value="PENDENTE">Pendente</option>
+                                                <option value="PAGO">Pago</option>
+                                                <option value="ATRASADO">Atrasado</option>
+                                            </select>
+                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-current opacity-60">
+                                                <svg className="fill-current h-2 w-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                                            </div>
+                                        </div>
+                                    )}
+                                </td>
+                                <td className="px-3 py-2 whitespace-nowrap text-center text-sm text-slate-500">
+                                    <div className="flex items-center justify-center">
+                                        {readOnly ? (
+                                            <span className={`text-xs ${t.paymentDate ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>
+                                                {t.paymentDate ? new Date(t.paymentDate).toLocaleDateString('pt-BR') : '-'}
+                                            </span>
+                                        ) : (
+                                            <div className={`relative flex items-center justify-center gap-1 px-1 py-1 rounded-lg border transition-all ${t.paymentDate ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-slate-200 bg-white text-slate-400 hover:border-slate-300'}`}>
+                                                <Calendar size={12} className={t.paymentDate ? 'text-blue-600' : 'text-slate-400'} />
+                                                <input 
+                                                    type="date" 
+                                                    value={t.paymentDate || ''}
+                                                    onChange={(e) => handleQuickPaymentDateChange(t, e.target.value)}
+                                                    className="bg-transparent border-none p-0 text-[10px] focus:ring-0 outline-none w-20 text-center font-medium cursor-pointer"
+                                                    style={{ color: 'inherit' }}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
-                            )}
-                        </td>
-                    </>
-                  ) : (
-                    // Row for Contas a Pagar
-                    <>
-                         <td className="px-3 py-2 whitespace-nowrap text-xs text-slate-600">
-                             {new Date(t.date).toLocaleDateString('pt-BR')}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-sm font-bold text-slate-800">
-                            {t.entity}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs text-slate-500 max-w-[150px] truncate">
-                            {t.description}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-sm font-bold text-red-700">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.amount)}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-center">
-                            {readOnly ? (
-                                <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusColor(t.status)}`}>
-                                    {t.status}
-                                </span>
-                            ) : (
-                                <div className="relative inline-block">
-                                    <select 
-                                        value={t.status}
-                                        onChange={(e) => onUpdateStatus(t.id, e.target.value as TransactionStatus)}
-                                        className={`appearance-none cursor-pointer pl-2 pr-6 py-0.5 rounded-full text-[10px] font-bold border focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-400 ${getStatusColor(t.status)}`}
-                                    >
-                                        <option value="PENDENTE">Pendente</option>
-                                        <option value="PAGO">Pago</option>
-                                        <option value="ATRASADO">Atrasado</option>
-                                    </select>
-                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-current opacity-60">
-                                        <svg className="fill-current h-2 w-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                                    </div>
-                                </div>
-                            )}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-center text-sm text-slate-500">
-                             <div className="flex items-center justify-center">
-                                 {readOnly ? (
-                                    <span className={`text-xs ${t.paymentDate ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>
-                                        {t.paymentDate ? new Date(t.paymentDate).toLocaleDateString('pt-BR') : '-'}
-                                    </span>
-                                 ) : (
-                                    <div className={`relative flex items-center justify-center gap-1 px-1 py-1 rounded-lg border transition-all ${t.paymentDate ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-slate-200 bg-white text-slate-400 hover:border-slate-300'}`}>
-                                        <Calendar size={12} className={t.paymentDate ? 'text-blue-600' : 'text-slate-400'} />
-                                        <input 
-                                            type="date" 
-                                            value={t.paymentDate || ''}
-                                            onChange={(e) => handleQuickPaymentDateChange(t, e.target.value)}
-                                            className="bg-transparent border-none p-0 text-[10px] focus:ring-0 outline-none w-20 text-center font-medium cursor-pointer"
-                                            style={{ color: 'inherit' }}
-                                        />
-                                    </div>
-                                 )}
-                             </div>
-                        </td>
-                         <td className="px-3 py-2 whitespace-nowrap text-center">
-                            {t.payer ? (
-                                <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-200">
-                                    {t.payer}
-                                </span>
-                            ) : '-'}
-                        </td>
-                    </>
-                  )}
+                                </td>
+                                <td className="px-3 py-2 whitespace-nowrap text-center">
+                                    {t.payer ? (
+                                        <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-200">
+                                            {t.payer}
+                                        </span>
+                                    ) : '-'}
+                                </td>
+                            </>
+                        )}
 
-                  {/* Actions Column (Shared) */}
-                  {!readOnly && (
-                    <td className="px-3 py-2 whitespace-nowrap text-center">
-                        <div className="flex items-center justify-center gap-1 relative z-10">
-                            <button 
-                                type="button"
-                                className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                                title="Editar"
-                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleEdit(t); }}
-                            >
-                                <Edit size={14} className="pointer-events-none" />
-                            </button>
-                            <button 
-                                type="button"
-                                onClick={(e) => { 
-                                    e.preventDefault(); 
-                                    e.stopPropagation(); 
-                                    setTimeout(() => handleDelete(t.id), 0);
-                                }}
-                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                title="Excluir"
-                            >
-                                <Trash2 size={14} className="pointer-events-none" />
-                            </button>
-                        </div>
-                    </td>
-                  )}
-                </tr>
+                        {/* Actions Column (Shared) */}
+                        {!readOnly && (
+                            <td className="px-3 py-2 whitespace-nowrap text-center">
+                                <div className="flex items-center justify-center gap-1 relative z-10">
+                                    <button 
+                                        type="button"
+                                        className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                        title="Editar"
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleEdit(t); }}
+                                    >
+                                        <Edit size={14} className="pointer-events-none" />
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={(e) => { 
+                                            e.preventDefault(); 
+                                            e.stopPropagation(); 
+                                            setTimeout(() => handleDelete(t.id), 0);
+                                        }}
+                                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                        title="Excluir"
+                                    >
+                                        <Trash2 size={14} className="pointer-events-none" />
+                                    </button>
+                                </div>
+                            </td>
+                        )}
+                        </tr>
+                    ))}
+                </React.Fragment>
               ))}
-              {filteredTransactions.length === 0 && (
+              
+              {groupedTransactions.length === 0 && (
                 <tr>
                   <td colSpan={readOnly ? (isEntry ? 5 : 7) : (isEntry ? 6 : 8)} className="px-6 py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">

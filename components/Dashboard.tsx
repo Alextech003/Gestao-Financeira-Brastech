@@ -11,9 +11,9 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
-  // Default to 2025 and December (11) to match the sample data provided so the user sees data immediately
-  const [selectedYear, setSelectedYear] = useState(2025);
-  const [selectedMonth, setSelectedMonth] = useState(11);
+  // Inicializa com o ano e mês atuais para mostrar dados relevantes imediatamente
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
 
   const months = [
     'JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'
@@ -31,8 +31,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
     }));
 
     transactions.forEach(t => {
-      // Fix: Parse YYYY-MM-DD manually to avoid timezone shifts (e.g. 2025-01-01 becoming 2024-12-31)
-      // Standard input type="date" returns YYYY-MM-DD
+      // Parse YYYY-MM-DD manually to avoid timezone shifts
       let year, month;
       
       try {
@@ -47,13 +46,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
         }
 
         if (year === selectedYear) {
-            // Logic: Only sum amounts if status is 'PAGO' for both types
-            if (t.status === 'PAGO') {
-                if (t.type === 'ENTRADA') {
-                    data[month].Entrada += t.amount;
-                } else if (t.type === 'SAIDA') {
-                    data[month].Saida += t.amount;
-                }
+            // Removida a restrição 'PAGO'. Agora mostra previsão total (Competência)
+            if (t.type === 'ENTRADA') {
+                data[month].Entrada += t.amount;
+            } else if (t.type === 'SAIDA') {
+                data[month].Saida += t.amount;
             }
         }
       } catch (e) {
@@ -91,15 +88,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
             }
 
             if (year === selectedYear && month === selectedMonth) {
-                // Logic: Only include if status is 'PAGO'
-                if (t.status === 'PAGO') {
-                    if (t.type === 'ENTRADA') {
-                        incomeByCategory[t.category] = (incomeByCategory[t.category] || 0) + t.amount;
-                        totalIncome += t.amount;
-                    } else if (t.type === 'SAIDA') {
-                        expenseByCategory[t.category] = (expenseByCategory[t.category] || 0) + t.amount;
-                        totalExpense += t.amount;
-                    }
+                // Inclui todas as transações do mês selecionado (Pagas e Pendentes)
+                if (t.type === 'ENTRADA') {
+                    incomeByCategory[t.category] = (incomeByCategory[t.category] || 0) + t.amount;
+                    totalIncome += t.amount;
+                } else if (t.type === 'SAIDA') {
+                    expenseByCategory[t.category] = (expenseByCategory[t.category] || 0) + t.amount;
+                    totalExpense += t.amount;
                 }
             }
        } catch (e) {
@@ -155,7 +150,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
           </div>
 
           {/* Entradas Summary Table */}
-          <Card className="!p-0 border-none" headerColor="bg-gradient-to-r from-green-600 to-emerald-500" title="Entradas" centerTitle>
+          <Card className="!p-0 border-none" headerColor="bg-gradient-to-r from-green-600 to-emerald-500" title="Entradas (Previsto)" centerTitle>
             <div className="divide-y divide-slate-100 bg-white">
               {Object.entries(monthData.incomeByCategory).map(([cat, val]) => (
                 <div key={cat} className="flex justify-between px-6 py-3 text-sm hover:bg-green-50/50 transition-colors">
@@ -174,7 +169,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
           </Card>
 
            {/* Despesas Summary Table */}
-           <Card className="!p-0 border-none" headerColor="bg-gradient-to-r from-red-600 to-rose-500" title="Despesas" centerTitle>
+           <Card className="!p-0 border-none" headerColor="bg-gradient-to-r from-red-600 to-rose-500" title="Despesas (Previsto)" centerTitle>
             <div className="divide-y divide-slate-100 bg-white">
               {Object.entries(monthData.expenseByCategory).map(([cat, val]) => (
                 <div key={cat} className="flex justify-between px-6 py-3 text-sm hover:bg-red-50/50 transition-colors">
@@ -200,7 +195,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                     <div className="w-1.5 h-8 bg-gradient-to-b from-blue-500 to-blue-700 rounded-full"></div>
-                    <h2 className="text-2xl font-bold text-slate-800">Fluxo Anual (Realizado)</h2>
+                    <h2 className="text-2xl font-bold text-slate-800">Fluxo Financeiro (Geral)</h2>
                 </div>
                 <div className="px-4 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-bold border border-blue-100">
                     {selectedYear}
