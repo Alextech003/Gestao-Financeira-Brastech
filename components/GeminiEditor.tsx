@@ -5,6 +5,7 @@ import { Card } from './ui/Card';
 
 // Helper para pegar a chave API injetada pelo Vite
 const getApiKey = () => {
+    // O Vite substitui process.env.API_KEY pelo valor da string durante o build
     // @ts-ignore
     return process.env.API_KEY;
 };
@@ -54,7 +55,7 @@ export const GeminiEditor: React.FC = () => {
     }
 
     if (!apiKey) {
-        setError("API Key do Google Gemini não configurada no ambiente.");
+        setError("API Key não configurada. Configure a variável API_KEY no painel da Vercel.");
         return;
     }
 
@@ -161,7 +162,7 @@ export const GeminiEditor: React.FC = () => {
                     {loading ? <Loader2 className="animate-spin" /> : <Wand2 />}
                     {loading ? 'Processando...' : 'Gerar com IA'}
                 </button>
-                {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+                {error && <p className="text-red-500 text-sm text-center font-bold bg-red-50 p-2 rounded border border-red-100">{error}</p>}
             </div>
         </Card>
 

@@ -3,18 +3,17 @@ import react from '@vitejs/plugin-react';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  // Carrega variáveis de ambiente do nível do sistema (Vercel) e arquivos .env
-  const env = loadEnv(mode, '.', '');
+  // @ts-ignore: process is defined in Node environment for build
+  const cwd = process.cwd();
+  
+  // Carrega variáveis de ambiente
+  const env = loadEnv(mode, cwd, '');
 
   return {
     plugins: [react()],
     define: {
-      // Define process.env como um objeto contendo apenas o necessário
-      // Isso evita erros de serialização no Vercel e 'process is not defined' no navegador
-      'process.env': {
-        API_KEY: env.API_KEY,
-        NODE_ENV: process.env.NODE_ENV
-      }
+      // Injeta a API_KEY de forma segura
+      'process.env.API_KEY': JSON.stringify(env.API_KEY || '')
     }
   };
 });
