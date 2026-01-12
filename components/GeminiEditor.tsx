@@ -3,14 +3,10 @@ import { GoogleGenAI } from "@google/genai";
 import { Upload, Wand2, Loader2, ImageIcon, Download } from 'lucide-react';
 import { Card } from './ui/Card';
 
-// Helper seguro para pegar a chave API sem quebrar se process não existir
+// Helper para pegar a chave API injetada pelo Vite
 const getApiKey = () => {
-    try {
-        // @ts-ignore
-        return process?.env?.API_KEY;
-    } catch {
-        return undefined;
-    }
+    // @ts-ignore
+    return process.env.API_KEY;
 };
 
 export const GeminiEditor: React.FC = () => {
