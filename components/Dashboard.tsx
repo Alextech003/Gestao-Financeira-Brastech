@@ -31,18 +31,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
     }));
 
     transactions.forEach(t => {
-      const tDate = new Date(t.date);
-      if (tDate.getFullYear() === selectedYear) {
-        const monthIdx = tDate.getMonth();
-        
-        // Logic: Only sum amounts if status is 'PAGO' for both types
-        if (t.status === 'PAGO') {
-            if (t.type === 'ENTRADA') {
-                data[monthIdx].Entrada += t.amount;
-            } else if (t.type === 'SAIDA') {
-                data[monthIdx].Saida += t.amount;
+      // Fix: Parse YYYY-MM-DD manually to avoid timezone shifts (e.g. 2025-01-01 becoming 2024-12-31)
+      // Standard input type="date" returns YYYY-MM-DD
+      let year, month;
+      
+      try {
+        if (typeof t.date === 'string' && t.date.includes('-')) {
+            const parts = t.date.split('T')[0].split('-'); // Handle both YYYY-MM-DD and ISO
+            year = parseInt(parts[0], 10);
+            month = parseInt(parts[1], 10) - 1; // 0-indexed for array access
+        } else {
+             const d = new Date(t.date);
+             year = d.getFullYear();
+             month = d.getMonth();
+        }
+
+        if (year === selectedYear) {
+            // Logic: Only sum amounts if status is 'PAGO' for both types
+            if (t.status === 'PAGO') {
+                if (t.type === 'ENTRADA') {
+                    data[month].Entrada += t.amount;
+                } else if (t.type === 'SAIDA') {
+                    data[month].Saida += t.amount;
+                }
             }
         }
+      } catch (e) {
+          console.error("Error parsing date for transaction", t);
       }
     });
 
@@ -57,27 +72,39 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
 
   // Calculate Selected Month Data for Side Tables
   const monthData = useMemo(() => {
-    const currentMonthTrans = transactions.filter(t => {
-      const d = new Date(t.date);
-      return d.getFullYear() === selectedYear && d.getMonth() === selectedMonth;
-    });
-
     const incomeByCategory: Record<string, number> = {};
     const expenseByCategory: Record<string, number> = {};
     let totalIncome = 0;
     let totalExpense = 0;
 
-    currentMonthTrans.forEach(t => {
-      // Logic: Only include if status is 'PAGO'
-      if (t.status === 'PAGO') {
-        if (t.type === 'ENTRADA') {
-            incomeByCategory[t.category] = (incomeByCategory[t.category] || 0) + t.amount;
-            totalIncome += t.amount;
-        } else if (t.type === 'SAIDA') {
-            expenseByCategory[t.category] = (expenseByCategory[t.category] || 0) + t.amount;
-            totalExpense += t.amount;
-        }
-      }
+    transactions.forEach(t => {
+       let year, month;
+       try {
+            if (typeof t.date === 'string' && t.date.includes('-')) {
+                const parts = t.date.split('T')[0].split('-');
+                year = parseInt(parts[0], 10);
+                month = parseInt(parts[1], 10) - 1;
+            } else {
+                const d = new Date(t.date);
+                year = d.getFullYear();
+                month = d.getMonth();
+            }
+
+            if (year === selectedYear && month === selectedMonth) {
+                // Logic: Only include if status is 'PAGO'
+                if (t.status === 'PAGO') {
+                    if (t.type === 'ENTRADA') {
+                        incomeByCategory[t.category] = (incomeByCategory[t.category] || 0) + t.amount;
+                        totalIncome += t.amount;
+                    } else if (t.type === 'SAIDA') {
+                        expenseByCategory[t.category] = (expenseByCategory[t.category] || 0) + t.amount;
+                        totalExpense += t.amount;
+                    }
+                }
+            }
+       } catch (e) {
+           // ignore bad dates
+       }
     });
 
     return { incomeByCategory, expenseByCategory, totalIncome, totalExpense };
