@@ -18,27 +18,28 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
 
   return (
     <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-2xl sticky top-0 z-50 border-b border-slate-700">
-      <div className="container mx-auto px-4 py-3">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+      <div className="container mx-auto px-4 py-4">
+        {/* Alterado para flex-col e items-center para centralizar tudo verticalmente */}
+        <div className="flex flex-col items-center justify-center gap-6">
           
-          {/* Logo Image 3D Effect */}
+          {/* Logo Image - Centralizada */}
           <div 
-            className="flex items-center cursor-pointer transition-transform hover:scale-105" 
+            className="flex items-center justify-center cursor-pointer transition-transform hover:scale-105" 
             onClick={() => setActiveTab('dashboard')}
           >
              <img 
                 src="/logo.png" 
                 alt="BrasTech" 
-                className="h-14 md:h-16 w-auto object-contain drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)] filter brightness-110"
+                className="h-16 md:h-20 w-auto object-contain drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)] filter brightness-110"
                 onError={(e) => {
                     e.currentTarget.style.display = 'none';
-                    e.currentTarget.parentElement!.innerHTML = '<span class="text-2xl font-black text-white">BRAS<span class="text-yellow-400">TECH</span></span>';
+                    e.currentTarget.parentElement!.innerHTML = '<span class="text-3xl font-black text-white tracking-wider">BRAS<span class="text-yellow-400">TECH</span></span>';
                 }}
              />
           </div>
 
-          {/* Navigation Pills */}
-          <nav className="flex flex-wrap justify-center gap-2">
+          {/* Navigation Pills - Centralizados */}
+          <nav className="flex flex-wrap justify-center gap-2 md:gap-3 w-full max-w-4xl">
             {navItems.map((item) => (
               <button
                 key={item.id}
@@ -46,7 +47,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                 className={`
                   flex items-center gap-2 px-4 py-2 rounded-full font-bold text-xs md:text-sm transition-all duration-300 shadow-lg border backdrop-blur-sm
                   ${activeTab === item.id 
-                    ? 'bg-blue-600 text-white border-blue-400 scale-105 shadow-blue-500/50' 
+                    ? 'bg-blue-600 text-white border-blue-400 scale-105 shadow-blue-500/50 ring-2 ring-blue-400/30' 
                     : 'bg-slate-700/40 text-slate-300 border-slate-600/50 hover:bg-slate-600 hover:text-white hover:border-slate-500'
                   }
                 `}
