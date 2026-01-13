@@ -41,7 +41,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
     }
   };
 
-  // 1. Calcular o saldo acumulado de todos os anos anteriores ao ano selecionado
+  // 1. Calcular o saldo acumulado de todos os anos anteriores ao ano selecionado (CAIXA REALIZADO)
+  // Isso pega todo o histórico até 31/Dez do ano anterior
   const previousBalance = useMemo(() => {
     return transactions.reduce((acc, t) => {
         const { year } = getTransactionDate(t.date);
@@ -49,14 +50,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
         // Soma tudo que é estritamente anterior ao ano selecionado
         if (year < selectedYear) {
             const amount = Number(t.amount) || 0;
-            // Verifica status: Apenas 'PAGO' ou 'RECEBIDO' (Entrada)? 
-            // Geralmente fluxo de caixa considera o realizado. 
-            // Se quiser considerar tudo (inclusive pendente), remova a checagem de status se desejar.
-            // Para simplificar e bater com o pedido, vamos somar tudo que foi registrado.
-            
             const type = t.type?.toUpperCase();
-            if (type === 'ENTRADA') return acc + amount;
-            if (type === 'SAIDA') return acc - amount;
+            
+            // REGRA DE OURO: Para compor saldo inicial (Caixa), consideramos apenas o que foi CONCRETIZADO (PAGO)
+            if (t.status === 'PAGO') {
+                if (type === 'ENTRADA') {
+                    return acc + amount;
+                }
+                if (type === 'SAIDA') {
+                    return acc - amount;
+                }
+            }
         }
         return acc;
     }, 0);
@@ -73,25 +77,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
       Saldo: 0
     }));
 
-    // Injeta o Saldo Anterior em JANEIRO (index 0) se for positivo
-    if (previousBalance > 0) {
+    // Injeta o Saldo Anterior em JANEIRO (index 0) se for diferente de zero
+    // Isso cumpre o requisito: "começar com esse valor em Entradas"
+    if (previousBalance !== 0) {
         data[0].Entrada += previousBalance;
     }
 
     transactions.forEach(t => {
       const { year, month } = getTransactionDate(t.date);
-      
-      // Garante que amount é número
       const amount = Number(t.amount) || 0;
 
       if (year === selectedYear && month >= 0 && month <= 11) {
-          // Normaliza o tipo para garantir match
           const type = t.type?.toUpperCase();
           
           if (type === 'ENTRADA') {
               data[month].Entrada += amount;
           } else if (type === 'SAIDA') {
-              data[month].Saida += amount;
+              // FILTRO: Só soma nas análises se estiver PAGO
+              if (t.status === 'PAGO') {
+                data[month].Saida += amount;
+              }
           }
       }
     });
@@ -111,12 +116,41 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
     let totalIncome = 0;
     let totalExpense = 0;
 
-    // Se estivermos em Janeiro e houver saldo anterior positivo, adiciona
-    if (selectedMonth === 0 && previousBalance > 0) {
-        incomeByCategory['Saldo Ano Anterior'] = previousBalance;
-        totalIncome += previousBalance;
+    // --- NOVA LÓGICA: SALDO DE CAIXA ACUMULADO ---
+    
+    // 1. Calcular o fluxo de caixa dos meses anteriores DENTRO do ano selecionado
+    // Ex: Se estamos em Março, soma (Jan + Fev)
+    let currentYearPreviousMonthsBalance = 0;
+
+    if (selectedMonth > 0) {
+        transactions.forEach(t => {
+            const { year, month } = getTransactionDate(t.date);
+            // Considera apenas transações do ano atual ANTERIORES ao mês selecionado e que estão PAGAS
+            if (year === selectedYear && month < selectedMonth && t.status === 'PAGO') {
+                const amount = Number(t.amount) || 0;
+                if (t.type === 'ENTRADA') {
+                    currentYearPreviousMonthsBalance += amount;
+                } else if (t.type === 'SAIDA') {
+                    currentYearPreviousMonthsBalance -= amount;
+                }
+            }
+        });
     }
 
+    // 2. Saldo Inicial Total = (Saldo Anos Anteriores) + (Saldo Meses Anteriores do Ano Atual)
+    const startingBalance = previousBalance + currentYearPreviousMonthsBalance;
+
+    // 3. Adiciona na lista de Entradas se não for zero
+    // Isso garante que o card de Entradas mostre o dinheiro que "sobrou" antes do mês atual começar
+    if (startingBalance !== 0) {
+        const label = selectedMonth === 0 ? 'Saldo Ano Anterior' : 'Saldo Mês Anterior';
+        incomeByCategory[label] = startingBalance;
+        totalIncome += startingBalance;
+    }
+
+    // --- FIM NOVA LÓGICA ---
+
+    // Processa transações do mês ATUAL
     transactions.forEach(t => {
        const { year, month } = getTransactionDate(t.date);
        const amount = Number(t.amount) || 0;
@@ -129,13 +163,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
                 incomeByCategory[category] = (incomeByCategory[category] || 0) + amount;
                 totalIncome += amount;
             } else if (type === 'SAIDA') {
-                expenseByCategory[category] = (expenseByCategory[category] || 0) + amount;
-                totalExpense += amount;
+                // FILTRO: Só soma nas análises se estiver PAGO
+                if (t.status === 'PAGO') {
+                    expenseByCategory[category] = (expenseByCategory[category] || 0) + amount;
+                    totalExpense += amount;
+                }
             }
        }
     });
 
-    return { incomeByCategory, expenseByCategory, totalIncome, totalExpense };
+    return { incomeByCategory, expenseByCategory, totalIncome, totalExpense, startingBalance };
   }, [transactions, selectedYear, selectedMonth, previousBalance]);
 
   const formatCurrency = (val: number) => 
@@ -188,12 +225,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
             <div className="divide-y divide-slate-100 bg-white">
               <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
                   {Object.entries(monthData.incomeByCategory).map(([cat, val]) => (
-                    <div key={cat} className={`flex justify-between px-6 py-3 text-sm hover:bg-green-50/50 transition-colors ${cat === 'Saldo Ano Anterior' ? 'bg-yellow-50' : ''}`}>
-                      <span className={`font-semibold truncate mr-2 ${cat === 'Saldo Ano Anterior' ? 'text-yellow-700 flex items-center gap-1' : 'text-slate-600'}`}>
-                        {cat === 'Saldo Ano Anterior' && <Wallet size={12} />}
+                    <div key={cat} className={`flex justify-between px-6 py-3 text-sm hover:bg-green-50/50 transition-colors ${cat.includes('Saldo') ? 'bg-yellow-50' : ''}`}>
+                      <span className={`font-semibold truncate mr-2 ${cat.includes('Saldo') ? 'text-yellow-700 flex items-center gap-1' : 'text-slate-600'}`}>
+                        {cat.includes('Saldo') && <Wallet size={12} />}
                         {cat}
                       </span>
-                      <span className="font-bold text-green-700 whitespace-nowrap">{formatCurrency(val as number)}</span>
+                      <span className={`font-bold whitespace-nowrap ${(val as number) < 0 ? 'text-red-600' : 'text-green-700'}`}>
+                        {formatCurrency(val as number)}
+                      </span>
                     </div>
                   ))}
                   {Object.keys(monthData.incomeByCategory).length === 0 && (
@@ -201,14 +240,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
                   )}
               </div>
               <div className="flex justify-between px-6 py-4 bg-green-50/80 font-black border-t border-green-100 text-green-800">
-                <span>TOTAL</span>
+                <span>TOTAL (C/ Saldo)</span>
                 <span>{formatCurrency(monthData.totalIncome)}</span>
               </div>
             </div>
           </Card>
 
            {/* Despesas Summary Table */}
-           <Card className="!p-0 border-none overflow-hidden" headerColor="bg-gradient-to-r from-red-600 to-rose-500" title="Despesas" centerTitle>
+           <Card className="!p-0 border-none overflow-hidden" headerColor="bg-gradient-to-r from-red-600 to-rose-500" title="Despesas (Pagas)" centerTitle>
             <div className="divide-y divide-slate-100 bg-white">
               <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
                   {Object.entries(monthData.expenseByCategory).map(([cat, val]) => (
@@ -218,7 +257,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
                     </div>
                   ))}
                    {Object.keys(monthData.expenseByCategory).length === 0 && (
-                     <div className="p-6 text-center text-slate-400 text-xs italic">Nenhum pagamento este mês</div>
+                     <div className="p-6 text-center text-slate-400 text-xs italic">Nenhuma despesa paga este mês</div>
                   )}
               </div>
               <div className="flex justify-between px-6 py-4 bg-red-50/80 font-black border-t border-red-100 text-red-800">
@@ -239,9 +278,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
                     <div>
                         <h2 className="text-2xl font-bold text-slate-800">Fluxo Financeiro</h2>
                         <div className="flex flex-col">
-                            <p className="text-xs text-slate-400 font-medium">Análise de Entradas e Saídas</p>
-                            {previousBalance > 0 && (
-                                <span className="text-[10px] text-green-600 font-bold flex items-center gap-1 bg-green-50 px-2 py-0.5 rounded-full w-fit mt-1 border border-green-100">
+                            <p className="text-xs text-slate-400 font-medium">Análise de Caixa Realizado (Apenas Pago)</p>
+                            {previousBalance !== 0 && (
+                                <span className={`text-[10px] font-bold flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-full w-fit mt-1 border ${previousBalance > 0 ? 'text-green-600 border-green-100' : 'text-red-500 border-red-100'}`}>
                                     <Wallet size={10} />
                                     Saldo Inicial (Ano Anterior): {formatCurrency(previousBalance)}
                                 </span>
@@ -290,7 +329,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
                     />
                     <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }}/>
                     <Area type="monotone" name="Entradas" dataKey="Entrada" stroke="#16a34a" strokeWidth={3} fillOpacity={1} fill="url(#colorEntrada)" animationDuration={1000} />
-                    <Area type="monotone" name="Despesas" dataKey="Saida" stroke="#dc2626" strokeWidth={3} fillOpacity={1} fill="url(#colorSaida)" animationDuration={1000} />
+                    <Area type="monotone" name="Despesas (Pagas)" dataKey="Saida" stroke="#dc2626" strokeWidth={3} fillOpacity={1} fill="url(#colorSaida)" animationDuration={1000} />
                 </AreaChart>
                 </ResponsiveContainer>
             </div>
@@ -323,9 +362,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
                 </td>
                 {yearlyData.map((d, i) => (
                   <td key={d.name} className="px-2 py-4 text-xs text-center text-slate-600 font-medium relative group">
-                      {d.Entrada > 0 ? formatCurrency(d.Entrada) : '-'}
+                      {d.Entrada !== 0 ? formatCurrency(d.Entrada) : '-'}
                       {/* Tooltip para mostrar quanto é do saldo anterior em Janeiro */}
-                      {i === 0 && previousBalance > 0 && (
+                      {i === 0 && previousBalance !== 0 && (
                           <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-[10px] p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
                               Inclui {formatCurrency(previousBalance)} (Ano Anterior)
                           </div>
