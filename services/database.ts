@@ -18,8 +18,16 @@ class DatabaseService {
     }
 
     async addTransaction(transaction: Omit<Transaction, 'id'>): Promise<Transaction | null> {
-        // Remove ID undefined se existir para o banco gerar
-        const { id, ...payload } = transaction as any;
+        // Remove ID undefined e campos que não existem no banco para evitar erros (PGRST204)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id, installmentCurrent, installmentTotal, ...rest } = transaction as any;
+        
+        // Sanitize payload: Empty strings should be null for optional fields/dates
+        const payload = {
+            ...rest,
+            paymentDate: rest.paymentDate || null,
+            payer: rest.payer || null
+        };
         
         const { data, error } = await supabase
             .from('transactions')
@@ -34,10 +42,40 @@ class DatabaseService {
         return data;
     }
 
+    // NOVA FUNÇÃO: Adicionar múltiplas transações (Bulk Insert)
+    async addManyTransactions(transactions: Omit<Transaction, 'id'>[]): Promise<Transaction[] | null> {
+        const payloads = transactions.map(t => {
+            // Remove ID e campos de parcela que não existem no banco
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { id, installmentCurrent, installmentTotal, ...rest } = t as any;
+            return {
+                ...rest,
+                // Sanitize payload: Convert empty strings to null
+                paymentDate: rest.paymentDate || null,
+                payer: rest.payer || null
+            };
+        });
+
+        const { data, error } = await supabase
+            .from('transactions')
+            .insert(payloads)
+            .select();
+
+        if (error) {
+            console.error('Erro ao adicionar múltiplas transações:', JSON.stringify(error, null, 2));
+            return null;
+        }
+        return data as Transaction[];
+    }
+
     async updateTransaction(transaction: Transaction): Promise<boolean> {
+        // Remove campos de parcela que não existem no banco para evitar erro no update
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { installmentCurrent, installmentTotal, ...rest } = transaction as any;
+
         // Converte campos undefined para null para o banco aceitar
         const payload = {
-            ...transaction,
+            ...rest,
             paymentDate: transaction.paymentDate || null,
             payer: transaction.payer || null
         };

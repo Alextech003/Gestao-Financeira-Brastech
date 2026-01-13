@@ -1,3 +1,4 @@
+
 export type TransactionType = 'ENTRADA' | 'SAIDA';
 
 export type TransactionStatus = 'PAGO' | 'PENDENTE' | 'ATRASADO' | 'AGUARDANDO';
@@ -15,6 +16,8 @@ export interface Transaction {
   category: string; // Kept for Dashboard analytics
   paymentDate?: string; // Only for Payables
   payer?: PayerOption; // Only for Payables
+  installmentCurrent?: number; // Parcela atual (ex: 1)
+  installmentTotal?: number;   // Total de parcelas (ex: 12)
 }
 
 export type ClientStatus = 'ATIVO' | 'INATIVO' | 'SUSPENSO';

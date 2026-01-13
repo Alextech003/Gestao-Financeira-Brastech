@@ -9,8 +9,8 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
   const navItems = [
     { id: 'dashboard', label: 'ANÁLISES', icon: BarChart3 },
-    { id: 'receivables', label: 'CONTAS A RECEBER', icon: ArrowUpCircle },
-    { id: 'payables', label: 'CONTAS A PAGAR', icon: ArrowDownCircle },
+    { id: 'receivables', label: 'ENTRADAS', icon: ArrowUpCircle },
+    { id: 'payables', label: 'SAÍDAS', icon: ArrowDownCircle },
     { id: 'clients', label: 'CLIENTES', icon: Users },
     { id: 'users', label: 'USUÁRIOS', icon: ShieldCheck },
     { id: 'ai-editor', label: 'IA EDITOR', icon: Sparkles },

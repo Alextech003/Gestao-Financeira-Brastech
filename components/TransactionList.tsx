@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { Transaction, TransactionType, PayerOption, TransactionStatus } from '../types';
-import { CheckCircle2, Clock, AlertCircle, Plus, Trash2, Edit, Calendar, DollarSign, Tag, User, FileText, UserCheck, Lock } from 'lucide-react';
+import { CheckCircle2, Clock, AlertCircle, Plus, Trash2, Edit, Calendar, DollarSign, Tag, User, FileText, UserCheck, Lock, Layers } from 'lucide-react';
 import { Card } from './ui/Card';
 
 interface TransactionListProps {
   type: TransactionType;
   transactions: Transaction[];
-  onAddTransaction: (t: Omit<Transaction, 'id'>) => void;
+  // Atualizado para aceitar array de transações (lote)
+  onAddTransaction: (t: Omit<Transaction, 'id'> | Omit<Transaction, 'id'>[]) => void;
   onUpdateTransaction: (t: Transaction) => void;
   onUpdateStatus: (id: string, status: TransactionStatus) => void;
   onDelete: (id: string) => void;
@@ -40,7 +41,12 @@ export const TransactionList: React.FC<TransactionListProps> = ({
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Installment State
+  const [isInstallment, setIsInstallment] = useState(false);
+  const [installmentsCount, setInstallmentsCount] = useState<number>(2);
+
   const isEntry = type === 'ENTRADA';
   
   // Helper para obter data local YYYY-MM-DD
@@ -78,12 +84,17 @@ export const TransactionList: React.FC<TransactionListProps> = ({
       payer: t.payer,
       paymentDate: t.paymentDate || ''
     });
+    // Ao editar, desativa lógica de criar parcelas novas para evitar duplicidade
+    setIsInstallment(false); 
     setShowForm(true);
   };
 
   const resetForm = () => {
     setEditingId(null);
     setShowForm(false);
+    setIsInstallment(false);
+    setInstallmentsCount(2);
+    setIsSubmitting(false);
     setNewTrans({
       date: getLocalToday(),
       description: '',
@@ -165,18 +176,30 @@ export const TransactionList: React.FC<TransactionListProps> = ({
       onUpdateTransaction(updatedT);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const addMonths = (dateStr: string, monthsToAdd: number) => {
+      const parts = dateStr.split('-');
+      const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      date.setMonth(date.getMonth() + monthsToAdd);
+      
+      return [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0')
+      ].join('-');
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (readOnly) return;
+    if (readOnly || isSubmitting) return;
+
+    setIsSubmitting(true);
     
     // Validate minimally if amount is provided, otherwise default to 0
     const finalAmount = newTrans.amount ? Number(newTrans.amount) : 0;
 
-    const transactionData = {
-      date: newTrans.date!,
+    const baseData = {
       description: newTrans.description || '',
       entity: newTrans.entity || '',
-      amount: finalAmount,
       category: newTrans.category || 'Geral',
       status: newTrans.status as TransactionStatus,
       type: type,
@@ -184,19 +207,66 @@ export const TransactionList: React.FC<TransactionListProps> = ({
       paymentDate: newTrans.paymentDate
     };
 
-    if (editingId) {
-      onUpdateTransaction({ ...transactionData, id: editingId });
-    } else {
-      onAddTransaction(transactionData);
+    try {
+        if (editingId) {
+            // Edição de item único
+            await onUpdateTransaction({ ...baseData, date: newTrans.date!, amount: finalAmount, id: editingId });
+        } else {
+            // Nova Transação (Verificar Parcelamento)
+            if (isInstallment && installmentsCount > 1 && !isEntry) {
+                // Lógica de cálculo preciso para evitar dízimas (ex: 100/3)
+                const total = finalAmount;
+                const count = installmentsCount;
+                
+                // Valor base arredondado para baixo (2 casas)
+                const baseValue = Math.floor((total / count) * 100) / 100;
+                
+                // O resto (centavos) vai para a primeira parcela
+                const remainder = Number((total - (baseValue * count)).toFixed(2));
+                
+                const transactionsBatch: Omit<Transaction, 'id'>[] = [];
+
+                // Loop para criar parcelas
+                for (let i = 0; i < count; i++) {
+                    const currentDate = addMonths(newTrans.date!, i);
+                    
+                    // Soma o resto na primeira parcela
+                    const installmentValue = i === 0 ? baseValue + remainder : baseValue;
+                    
+                    transactionsBatch.push({
+                        ...baseData,
+                        date: currentDate,
+                        amount: installmentValue,
+                        // ADICIONA NÚMERO DA PARCELA NA DESCRIÇÃO (Já que o banco não tem coluna própria)
+                        description: `${baseData.description} (${i + 1}/${count})`,
+                        installmentCurrent: i + 1, // Mantém para UI local (mas será removido ao enviar pro banco)
+                        installmentTotal: count,
+                        status: i === 0 ? baseData.status : 'PENDENTE' // Apenas a primeira herda o status do form se for pago
+                    });
+                }
+                
+                // Envia todas juntas (Bulk Insert)
+                await onAddTransaction(transactionsBatch);
+
+            } else {
+                // Transação única normal
+                await onAddTransaction({ ...baseData, date: newTrans.date!, amount: finalAmount });
+            }
+        }
+        resetForm();
+    } catch (error) {
+        console.error("Erro ao salvar:", error);
+        setIsSubmitting(false); // Reabilita o botão em caso de erro
     }
-    
-    resetForm();
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm("Tem certeza que deseja excluir este lançamento?")) {
-        onDelete(id);
-    }
+    // Add small timeout to ensure UI updates before blocking alert
+    setTimeout(() => {
+        if (window.confirm("Tem certeza que deseja excluir este lançamento?")) {
+            onDelete(id);
+        }
+    }, 50);
   };
 
   const headerGradient = isEntry ? 'bg-gradient-to-r from-green-600 to-emerald-600' : 'bg-gradient-to-r from-red-600 to-rose-600';
@@ -212,16 +282,13 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     }
   };
 
-  // Helper para formatar data do separador (Corrigido para evitar timezone UTC)
   const formatHeaderDate = (dateStr: string) => {
       if (!dateStr) return '-';
       const parts = dateStr.split('-');
-      // Cria a data localmente usando o construtor (Ano, Mês-1, Dia)
       const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
       return date.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
   };
 
-  // Helper para formatar data curta na tabela (dd/mm) - Sem Timezone issue
   const formatShortDate = (dateStr: string) => {
       if (!dateStr) return '-';
       const parts = dateStr.split('-');
@@ -229,7 +296,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({
       return date.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'});
   };
   
-  // Helper para formatar data completa na tabela (dd/mm/aaaa)
   const formatFullDate = (dateStr: string) => {
       if (!dateStr) return '-';
       const parts = dateStr.split('-');
@@ -245,7 +311,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
         <div>
            <div className="flex items-center gap-3">
               <h2 className={`text-3xl font-black tracking-tight ${isEntry ? 'text-green-700' : 'text-red-700'}`}>
-                {isEntry ? 'Contas a Receber' : 'Contas a Pagar'}
+                {isEntry ? 'Entradas' : 'Saídas'}
               </h2>
               {readOnly && (
                 <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-bold border border-slate-200 flex items-center gap-1">
@@ -254,7 +320,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
               )}
            </div>
           <p className="text-slate-500 text-sm mt-1">
-            {isEntry ? 'Gerencie recebimentos e datas de entrada.' : 'Controle pagamentos, vencimentos e responsáveis.'}
+            {isEntry ? 'Gerencie recebimentos e contas a receber.' : 'Controle despesas e contas a pagar.'}
           </p>
         </div>
        
@@ -266,7 +332,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
             <div className="bg-white/20 p-1 rounded-lg group-hover:bg-white/30 transition-colors">
                 <Plus size={20} /> 
             </div>
-            <span>Novo Lançamento</span>
+            <span>{isEntry ? "Nova Entrada" : "Nova Saída"}</span>
             </button>
         )}
       </div>
@@ -274,7 +340,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
       {/* Modern Form */}
       {showForm && !readOnly && (
         <Card 
-            title={editingId ? "Editar Lançamento" : (isEntry ? "Novo Recebimento" : "Nova Despesa")} 
+            title={editingId ? "Editar Lançamento" : (isEntry ? "Nova Entrada" : "Nova Saída")} 
             className={`border-t-4 ${isEntry ? 'border-t-green-500' : 'border-t-red-500'}`}
             onBack={resetForm}
         >
@@ -333,7 +399,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
 
             <div className="lg:col-span-3 group">
                <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
-                 <DollarSign size={14} /> Valor (R$)
+                 <DollarSign size={14} /> Valor {isInstallment ? 'TOTAL' : ''} (R$)
                </label>
                <div className="relative">
                  <span className="absolute left-4 top-3.5 text-slate-400 font-bold">R$</span>
@@ -402,6 +468,59 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                             onChange={e => handlePaymentDateChange(e.target.value)} 
                         />
                     </div>
+
+                    {/* Installment Toggle for Expenses */}
+                    {!editingId && (
+                        <div className="lg:col-span-12 bg-slate-50 p-4 rounded-xl border border-slate-200 mt-2 flex flex-col sm:flex-row gap-6 items-start sm:items-center">
+                            <div className="flex items-center gap-3">
+                                <label className="flex items-center cursor-pointer gap-2">
+                                    <input 
+                                        type="checkbox" 
+                                        className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                        checked={isInstallment}
+                                        onChange={(e) => setIsInstallment(e.target.checked)}
+                                    />
+                                    <span className="font-bold text-slate-700 flex items-center gap-2">
+                                        <Layers size={18} className="text-blue-500" />
+                                        Parcelado?
+                                    </span>
+                                </label>
+                            </div>
+                            
+                            {isInstallment && (
+                                <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2">
+                                    <span className="text-sm font-medium text-slate-600">Quantidade:</span>
+                                    <div className="flex items-center">
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setInstallmentsCount(Math.max(2, installmentsCount - 1))}
+                                            className="w-8 h-8 flex items-center justify-center bg-white border border-slate-300 rounded-l-lg hover:bg-slate-100 font-bold"
+                                        >
+                                            -
+                                        </button>
+                                        <input 
+                                            type="number" 
+                                            min="2" 
+                                            max="36" 
+                                            value={installmentsCount}
+                                            onChange={(e) => setInstallmentsCount(Math.max(2, parseInt(e.target.value) || 2))}
+                                            className="w-14 h-8 text-center border-y border-slate-300 bg-blue-600 outline-none font-bold text-white" 
+                                        />
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setInstallmentsCount(installmentsCount + 1)}
+                                            className="w-8 h-8 flex items-center justify-center bg-white border border-slate-300 rounded-r-lg hover:bg-slate-100 font-bold"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
+                                    <span className="text-xs text-slate-400 ml-2">
+                                        {newTrans.amount ? `(${installmentsCount}x de ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(newTrans.amount) / installmentsCount)})` : ''}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </>
             )}
 
@@ -409,15 +528,17 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                <button 
                   type="button" 
                   onClick={resetForm}
-                  className="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-colors"
+                  disabled={isSubmitting}
+                  className="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-colors disabled:opacity-50"
                >
                  Cancelar
                </button>
                <button 
                   type="submit" 
-                  className={`text-white px-8 py-3 rounded-xl font-bold shadow-lg transition-all transform hover:-translate-y-0.5 ${isEntry ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                  disabled={isSubmitting}
+                  className={`text-white px-8 py-3 rounded-xl font-bold shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed ${isEntry ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
                 >
-                 {editingId ? "Atualizar" : "Salvar"}
+                 {isSubmitting ? "Salvando..." : (editingId ? "Atualizar" : "Salvar")}
                </button>
             </div>
           </form>
@@ -518,6 +639,13 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                                 </td>
                                 <td className="px-3 py-2 text-xs text-slate-500 whitespace-normal break-words">
                                     {t.description}
+                                    {/* Installment Badge */}
+                                    {t.installmentCurrent && t.installmentTotal && (
+                                        <span className="inline-flex items-center gap-0.5 ml-2 px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 font-bold text-[9px] border border-blue-200">
+                                            <Layers size={8} />
+                                            {t.installmentCurrent}/{t.installmentTotal}
+                                        </span>
+                                    )}
                                 </td>
                                 <td className="px-3 py-2 whitespace-nowrap text-sm font-bold text-red-700">
                                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.amount)}
@@ -591,7 +719,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                                         onClick={(e) => { 
                                             e.preventDefault(); 
                                             e.stopPropagation(); 
-                                            setTimeout(() => handleDelete(t.id), 0);
+                                            handleDelete(t.id);
                                         }}
                                         className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                                         title="Excluir"

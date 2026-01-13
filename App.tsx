@@ -99,10 +99,26 @@ function App() {
   };
 
   // Transactions Logic
-  const addTransaction = async (t: Omit<Transaction, 'id'>) => {
+  const addTransaction = async (t: Omit<Transaction, 'id'> | Omit<Transaction, 'id'>[]) => {
     setLoadingData(true);
-    await db.addTransaction(t);
-    await loadData(); // Reload to get the real ID from DB
+    try {
+        let result;
+        if (Array.isArray(t)) {
+            result = await db.addManyTransactions(t);
+        } else {
+            result = await db.addTransaction(t);
+        }
+
+        // If DB returned null (error logged there), we throw here to notify UI
+        if (!result) throw new Error("Falha ao salvar no banco de dados.");
+
+        await loadData(); // Reload to get the real ID from DB
+    } catch (error) {
+        console.error("Erro ao salvar transação:", error);
+        throw error; // Propagate error so Form doesn't close
+    } finally {
+        setLoadingData(false);
+    }
   };
 
   const updateTransaction = async (updatedT: Transaction) => {

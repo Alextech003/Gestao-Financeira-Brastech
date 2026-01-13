@@ -309,7 +309,7 @@ export const UserList: React.FC<UserListProps> = ({
                                             onClick={(e) => { 
                                                 e.preventDefault(); 
                                                 e.stopPropagation(); 
-                                                setTimeout(() => handleDelete(u.id), 0);
+                                                handleDelete(u.id);
                                             }} 
                                             className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-all"
                                         >

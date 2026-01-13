@@ -311,7 +311,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                                         onClick={(e) => { 
                                             e.preventDefault(); 
                                             e.stopPropagation(); 
-                                            setTimeout(() => handleDelete(c.id), 0);
+                                            handleDelete(c.id);
                                         }} 
                                         className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" 
                                         title="Excluir"
