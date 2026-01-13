@@ -191,6 +191,23 @@ class DatabaseService {
         return session ? JSON.parse(session) : null;
     }
 
+    // --- Settings ---
+    async updateSettings(settings: any): Promise<boolean> {
+        try {
+            const current = JSON.parse(localStorage.getItem('brastech_settings') || '{}');
+            const updated = { ...current, ...settings };
+            localStorage.setItem('brastech_settings', JSON.stringify(updated));
+            return true;
+        } catch (error) {
+            console.error('Erro ao salvar configurações:', error);
+            return false;
+        }
+    }
+
+    getSettings(): any {
+        return JSON.parse(localStorage.getItem('brastech_settings') || '{}');
+    }
+
     // --- Export (Backup) ---
     async exportDatabase(): Promise<string> {
         const [trans, clients, users] = await Promise.all([
