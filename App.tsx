@@ -184,7 +184,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-100 font-sans text-gray-900">
-      <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Navbar activeTab={activeTab} setActiveTab={setActiveTab} currentUser={activeUser} />
       
       {/* Logout Bar */}
       <div className="bg-slate-900 text-white text-xs py-1 px-4 flex justify-between items-center">
@@ -236,7 +236,8 @@ function App() {
            />
         )}
 
-        {activeTab === 'users' && (
+        {/* Proteção adicional de renderização */}
+        {activeTab === 'users' && activeUser.name === 'Adm Master' && (
             <UserList 
                 users={users}
                 onAddUser={addUser}

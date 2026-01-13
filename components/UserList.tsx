@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, UserRole, UserStatus } from '../types';
-import { Plus, Trash2, Edit, User as UserIcon, Mail, Shield, AlertTriangle, Upload, Camera, Eye, EyeOff, Lock } from 'lucide-react';
+import { Plus, Trash2, Edit, User as UserIcon, Mail, Shield, AlertTriangle, Upload, Camera, Eye, EyeOff, Lock, Clock } from 'lucide-react';
 import { Card } from './ui/Card';
 
 interface UserListProps {
@@ -242,6 +242,7 @@ export const UserList: React.FC<UserListProps> = ({
                         {isMaster && <th className="px-6 py-4 text-red-600">Senha (Master)</th>}
                         <th className="px-6 py-4 text-center">Nível</th>
                         <th className="px-6 py-4 text-center">Status</th>
+                        <th className="px-6 py-4 text-center">Último Acesso</th>
                         <th className="px-6 py-4 text-center">Ações</th>
                     </tr>
                 </thead>
@@ -293,6 +294,12 @@ export const UserList: React.FC<UserListProps> = ({
                                 <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold ${getStatusColor(u.status)}`}>
                                     {u.status}
                                 </span>
+                            </td>
+                             <td className="px-6 py-4 whitespace-nowrap text-center text-xs text-slate-500 font-medium">
+                                <div className="flex items-center justify-center gap-1">
+                                    <Clock size={12} className="text-slate-400" />
+                                    {u.lastAccess || 'Nunca'}
+                                </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                                 <div className="flex items-center justify-center gap-2">

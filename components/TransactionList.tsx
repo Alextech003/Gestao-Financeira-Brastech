@@ -282,11 +282,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     }
   };
 
-  const formatHeaderDate = (dateStr: string) => {
-      if (!dateStr) return '-';
+  const formatWeekday = (dateStr: string) => {
+      if (!dateStr) return '';
       const parts = dateStr.split('-');
       const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-      return date.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+      return date.toLocaleDateString('pt-BR', { weekday: 'long' });
   };
 
   const formatShortDate = (dateStr: string) => {
@@ -579,10 +579,27 @@ export const TransactionList: React.FC<TransactionListProps> = ({
             <tbody className="divide-y divide-slate-50">
               {groupedTransactions.map((group) => (
                 <React.Fragment key={group.date}>
-                    {/* Linha Separadora de Data */}
-                    <tr className="bg-slate-50/80 border-b border-slate-100">
-                        <td colSpan={10} className="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wide">
-                            {formatHeaderDate(group.date)}
+                    {/* Linha Separadora de Data - ESTILO PÍLULA FLUTUANTE (ATUALIZADO) */}
+                    <tr>
+                        <td colSpan={10} className="p-0 border-none">
+                            <div className="relative h-14 flex items-center justify-center my-1">
+                                {/* Linha de fundo */}
+                                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[1px] bg-blue-100/80"></div>
+                                
+                                {/* Pílula Central */}
+                                <div className="relative z-10 bg-blue-600 border border-blue-500 rounded-full px-6 py-1.5 flex items-center gap-3 shadow-md">
+                                    <div className="flex items-center gap-2">
+                                        <Calendar size={14} className="text-white" />
+                                        <span className="font-bold text-white text-xs uppercase tracking-wide">
+                                            {formatFullDate(group.date)}
+                                        </span>
+                                    </div>
+                                    <span className="text-blue-300 text-[10px]">•</span>
+                                    <span className="font-bold text-white text-xs uppercase tracking-wide">
+                                        {formatWeekday(group.date)}
+                                    </span>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                     

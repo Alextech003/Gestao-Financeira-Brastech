@@ -88,19 +88,38 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
         {/* Central Brand Content */}
         <div className="relative z-20 text-center px-12 flex flex-col items-center">
-            <img 
-                src="/logo.png" 
-                alt="BrasTech Rastreamento" 
-                className="w-96 h-auto mb-8 drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] transform hover:scale-105 transition-transform duration-500"
-                onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    e.currentTarget.parentElement!.innerHTML += `
-                        <h1 class="text-5xl font-black text-white mb-4 tracking-tight">
-                            Bras<span class="text-blue-500">Tech</span>
-                        </h1>
-                    `;
-                }}
-            />
+             {/* 3D LOGO EFFECT (Updated Colors) */}
+            <div className="flex flex-col items-center mb-8 transform hover:scale-105 transition-transform duration-500 select-none">
+                <div className="flex items-center text-8xl font-black tracking-tighter gap-1">
+                    {/* BR - Verde */}
+                    <span 
+                        className="text-green-500"
+                        style={{ textShadow: '1px 1px 0 #15803d, 2px 2px 0 #15803d, 3px 3px 0 #14532d, 4px 4px 0 #14532d, 6px 6px 8px rgba(0,0,0,0.4)' }}
+                    >
+                        BR
+                    </span>
+                    {/* AS - Amarelo */}
+                    <span 
+                        className="text-yellow-400"
+                        style={{ textShadow: '1px 1px 0 #ca8a04, 2px 2px 0 #ca8a04, 3px 3px 0 #a16207, 4px 4px 0 #a16207, 6px 6px 8px rgba(0,0,0,0.4)' }}
+                    >
+                        AS
+                    </span>
+                    {/* TECH - Branco com Fundo Azul */}
+                    <div className="ml-3 bg-blue-600 px-4 py-1 rounded-2xl shadow-2xl transform -skew-x-3 border-b-8 border-blue-800">
+                        <span 
+                            className="text-white block transform skew-x-3"
+                            style={{ textShadow: 'none' }}
+                        >
+                            TECH
+                        </span>
+                    </div>
+                </div>
+                <span className="text-lg font-bold text-blue-300 tracking-[0.4em] mt-4 uppercase drop-shadow-md opacity-90">
+                    Rastreamento Veicular
+                </span>
+            </div>
+
             <p className="text-slate-300 text-lg max-w-md mx-auto leading-relaxed font-medium drop-shadow-md">
                 Tecnologia avançada em rastreamento veicular e gestão logística para sua empresa ir mais longe.
             </p>
@@ -122,17 +141,31 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
          <div className="bg-white/95 backdrop-blur-sm w-full max-w-md p-8 md:p-12 rounded-3xl shadow-2xl lg:shadow-none lg:bg-transparent relative z-10 border lg:border-none border-slate-100/50">
             
-            <div className="mb-10">
-                <div className="lg:hidden flex justify-center mb-6">
-                     <img 
-                        src="/logo.png" 
-                        alt="BrasTech" 
-                        className="h-24 w-auto object-contain drop-shadow-md"
-                        onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                        }}
-                     />
+            <div className="mb-10 flex flex-col items-center lg:items-start">
+                {/* Mobile Logo (Updated Colors) */}
+                <div className="lg:hidden flex flex-col items-center mb-6 select-none">
+                    <div className="flex items-center text-5xl font-black tracking-tighter gap-1">
+                        <span 
+                            className="text-green-600"
+                            style={{ textShadow: '1px 1px 0 #15803d, 2px 2px 0 #14532d' }}
+                        >
+                            BR
+                        </span>
+                        <span 
+                            className="text-yellow-500"
+                            style={{ textShadow: '1px 1px 0 #ca8a04, 2px 2px 0 #a16207' }}
+                        >
+                            AS
+                        </span>
+                        <div className="ml-1 bg-blue-600 px-2 py-0 rounded-lg shadow-md border-b-4 border-blue-800">
+                            <span className="text-white">TECH</span>
+                        </div>
+                    </div>
+                    <span className="text-[0.6rem] font-bold text-blue-500 tracking-[0.3em] uppercase mt-2">
+                        Rastreamento Veicular
+                    </span>
                 </div>
+
                 <h2 className="text-3xl font-black text-slate-900 mb-2 text-center lg:text-left">Bem-vindo</h2>
                 <p className="text-slate-500 text-center lg:text-left">Acesse o painel de monitoramento e gestão.</p>
             </div>
