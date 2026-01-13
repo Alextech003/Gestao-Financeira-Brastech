@@ -443,7 +443,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                 <>
                     <div className="lg:col-span-3 group">
                         <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
-                            <UserCheck size={14} /> Quem Pagou?
+                            <UserCheck size={14} /> Responsável
                         </label>
                         <select 
                             className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
@@ -570,7 +570,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                         <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider">Valor</th>
                         <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider">Status</th>
                         <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider">Data de Pagamento</th>
-                        <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider">Quem</th>
+                        <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider">Responsável</th>
                         {!readOnly && <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider last:rounded-tr-2xl">Ações</th>}
                     </>
                 )}

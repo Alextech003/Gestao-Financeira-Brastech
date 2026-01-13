@@ -240,7 +240,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
                   )}
               </div>
               <div className="flex justify-between px-6 py-4 bg-green-50/80 font-black border-t border-green-100 text-green-800">
-                <span>TOTAL (C/ Saldo)</span>
+                <span>TOTAL</span>
                 <span>{formatCurrency(monthData.totalIncome)}</span>
               </div>
             </div>
