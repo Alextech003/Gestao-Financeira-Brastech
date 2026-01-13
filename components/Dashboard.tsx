@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area 
 } from 'recharts';
 import { Card } from './ui/Card';
-import { Calendar, ChevronDown, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { Calendar, ChevronDown, TrendingUp, TrendingDown, DollarSign, Wallet } from 'lucide-react';
 
 interface DashboardProps {
   transactions: Transaction[];
@@ -41,6 +41,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
     }
   };
 
+  // 1. Calcular o saldo acumulado de todos os anos anteriores ao ano selecionado
+  const previousBalance = useMemo(() => {
+    return transactions.reduce((acc, t) => {
+        const { year } = getTransactionDate(t.date);
+        
+        // Soma tudo que é estritamente anterior ao ano selecionado
+        if (year < selectedYear) {
+            const amount = Number(t.amount) || 0;
+            // Verifica status: Apenas 'PAGO' ou 'RECEBIDO' (Entrada)? 
+            // Geralmente fluxo de caixa considera o realizado. 
+            // Se quiser considerar tudo (inclusive pendente), remova a checagem de status se desejar.
+            // Para simplificar e bater com o pedido, vamos somar tudo que foi registrado.
+            
+            const type = t.type?.toUpperCase();
+            if (type === 'ENTRADA') return acc + amount;
+            if (type === 'SAIDA') return acc - amount;
+        }
+        return acc;
+    }, 0);
+  }, [transactions, selectedYear]);
+
   // Cálculo dos dados anuais (Gráfico e Tabela Inferior)
   const yearlyData = useMemo(() => {
     // Cria estrutura base zerada para os 12 meses
@@ -51,6 +72,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
       Saida: 0,
       Saldo: 0
     }));
+
+    // Injeta o Saldo Anterior em JANEIRO (index 0) se for positivo
+    if (previousBalance > 0) {
+        data[0].Entrada += previousBalance;
+    }
 
     transactions.forEach(t => {
       const { year, month } = getTransactionDate(t.date);
@@ -76,7 +102,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
     });
 
     return data;
-  }, [transactions, selectedYear]);
+  }, [transactions, selectedYear, previousBalance]);
 
   // Cálculo dos dados do Mês Selecionado (Resumo Lateral)
   const monthData = useMemo(() => {
@@ -84,6 +110,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
     const expenseByCategory: Record<string, number> = {};
     let totalIncome = 0;
     let totalExpense = 0;
+
+    // Se estivermos em Janeiro e houver saldo anterior positivo, adiciona
+    if (selectedMonth === 0 && previousBalance > 0) {
+        incomeByCategory['Saldo Ano Anterior'] = previousBalance;
+        totalIncome += previousBalance;
+    }
 
     transactions.forEach(t => {
        const { year, month } = getTransactionDate(t.date);
@@ -104,7 +136,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
     });
 
     return { incomeByCategory, expenseByCategory, totalIncome, totalExpense };
-  }, [transactions, selectedYear, selectedMonth]);
+  }, [transactions, selectedYear, selectedMonth, previousBalance]);
 
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
@@ -156,8 +188,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
             <div className="divide-y divide-slate-100 bg-white">
               <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
                   {Object.entries(monthData.incomeByCategory).map(([cat, val]) => (
-                    <div key={cat} className="flex justify-between px-6 py-3 text-sm hover:bg-green-50/50 transition-colors">
-                      <span className="font-semibold text-slate-600 truncate mr-2">{cat}</span>
+                    <div key={cat} className={`flex justify-between px-6 py-3 text-sm hover:bg-green-50/50 transition-colors ${cat === 'Saldo Ano Anterior' ? 'bg-yellow-50' : ''}`}>
+                      <span className={`font-semibold truncate mr-2 ${cat === 'Saldo Ano Anterior' ? 'text-yellow-700 flex items-center gap-1' : 'text-slate-600'}`}>
+                        {cat === 'Saldo Ano Anterior' && <Wallet size={12} />}
+                        {cat}
+                      </span>
                       <span className="font-bold text-green-700 whitespace-nowrap">{formatCurrency(val as number)}</span>
                     </div>
                   ))}
@@ -203,7 +238,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
                     <div className="w-1.5 h-8 bg-gradient-to-b from-blue-500 to-blue-700 rounded-full"></div>
                     <div>
                         <h2 className="text-2xl font-bold text-slate-800">Fluxo Financeiro</h2>
-                        <p className="text-xs text-slate-400 font-medium">Análise de Entradas e Saídas (Previsto + Realizado)</p>
+                        <div className="flex flex-col">
+                            <p className="text-xs text-slate-400 font-medium">Análise de Entradas e Saídas</p>
+                            {previousBalance > 0 && (
+                                <span className="text-[10px] text-green-600 font-bold flex items-center gap-1 bg-green-50 px-2 py-0.5 rounded-full w-fit mt-1 border border-green-100">
+                                    <Wallet size={10} />
+                                    Saldo Inicial (Ano Anterior): {formatCurrency(previousBalance)}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
                 
@@ -278,8 +321,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
                 <td className="py-4 pl-6 pr-3 text-sm font-bold text-green-700 uppercase flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-green-500"></div> Entradas
                 </td>
-                {yearlyData.map(d => (
-                  <td key={d.name} className="px-2 py-4 text-xs text-center text-slate-600 font-medium">{d.Entrada > 0 ? formatCurrency(d.Entrada) : '-'}</td>
+                {yearlyData.map((d, i) => (
+                  <td key={d.name} className="px-2 py-4 text-xs text-center text-slate-600 font-medium relative group">
+                      {d.Entrada > 0 ? formatCurrency(d.Entrada) : '-'}
+                      {/* Tooltip para mostrar quanto é do saldo anterior em Janeiro */}
+                      {i === 0 && previousBalance > 0 && (
+                          <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-[10px] p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                              Inclui {formatCurrency(previousBalance)} (Ano Anterior)
+                          </div>
+                      )}
+                  </td>
                 ))}
               </tr>
               <tr className="hover:bg-red-50/30 transition-colors">
