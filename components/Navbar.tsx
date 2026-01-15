@@ -18,13 +18,17 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, current
     { id: 'ai-editor', label: 'IA EDITOR', icon: Sparkles },
   ];
 
-  // Estilos de animação inline para o efeito de tráfego
+  // Estilos de animação inline para o efeito de tráfego e logo giratória
   const styles = `
     @keyframes traffic-move {
       0% { transform: translateX(-150%) skewX(-20deg); opacity: 0; }
       10% { opacity: 1; }
       90% { opacity: 1; }
       100% { transform: translateX(150vw) skewX(-20deg); opacity: 0; }
+    }
+    @keyframes spin-tech-skew {
+      0%, 85% { transform: perspective(1000px) rotateY(0deg) skewX(-3deg); }
+      100% { transform: perspective(1000px) rotateY(360deg) skewX(-3deg); }
     }
     .traffic-lane {
       position: absolute;
@@ -38,6 +42,10 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, current
       border-radius: 99px;
       filter: blur(4px);
       animation: traffic-move linear infinite;
+    }
+    .tech-badge-skew {
+      animation: spin-tech-skew 6s ease-in-out infinite;
+      transform-style: preserve-3d;
     }
   `;
 
@@ -107,8 +115,8 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, current
                 >
                     AS
                 </span>
-                {/* TECH - Branco com Fundo Azul */}
-                <div className="ml-1 bg-blue-600 rounded-lg px-2 py-0 shadow-lg transform -skew-x-3 border-b-4 border-blue-800 relative overflow-hidden">
+                {/* TECH - Branco com Fundo Azul - ANIMATED */}
+                <div className="ml-1 bg-blue-600 rounded-lg px-2 py-0 shadow-lg border-b-4 border-blue-800 relative overflow-hidden tech-badge-skew">
                     {/* Brilho no Tech */}
                     <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12 animate-pulse"></div>
                     <span 

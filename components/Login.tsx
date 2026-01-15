@@ -38,6 +38,24 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
   return (
     <div className="min-h-screen w-full flex bg-slate-900 font-sans overflow-hidden">
+      <style>{`
+        @keyframes spin-tech-skew {
+          0%, 85% { transform: perspective(1000px) rotateY(0deg) skewX(-3deg); }
+          100% { transform: perspective(1000px) rotateY(360deg) skewX(-3deg); }
+        }
+        @keyframes spin-tech-normal {
+          0%, 85% { transform: perspective(1000px) rotateY(0deg); }
+          100% { transform: perspective(1000px) rotateY(360deg); }
+        }
+        .tech-badge-skew {
+          animation: spin-tech-skew 6s ease-in-out infinite;
+          transform-style: preserve-3d;
+        }
+        .tech-badge-normal {
+          animation: spin-tech-normal 6s ease-in-out infinite;
+          transform-style: preserve-3d;
+        }
+      `}</style>
       
       {/* Lado Esquerdo - Visual e Animações (Visível apenas em Desktop) */}
       <div className="hidden lg:flex w-1/2 relative items-center justify-center overflow-hidden">
@@ -88,7 +106,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
         {/* Central Brand Content */}
         <div className="relative z-20 text-center px-12 flex flex-col items-center">
-             {/* 3D LOGO EFFECT (Updated Colors) */}
+             {/* 3D LOGO EFFECT (Updated Colors & Animation) */}
             <div className="flex flex-col items-center mb-8 transform hover:scale-105 transition-transform duration-500 select-none">
                 <div className="flex items-center text-8xl font-black tracking-tighter gap-1">
                     {/* BR - Verde */}
@@ -105,8 +123,8 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     >
                         AS
                     </span>
-                    {/* TECH - Branco com Fundo Azul */}
-                    <div className="ml-3 bg-blue-600 px-4 py-1 rounded-2xl shadow-2xl transform -skew-x-3 border-b-8 border-blue-800">
+                    {/* TECH - Branco com Fundo Azul - ANIMATED */}
+                    <div className="ml-3 bg-blue-600 px-4 py-1 rounded-2xl shadow-2xl border-b-8 border-blue-800 tech-badge-skew">
                         <span 
                             className="text-white block transform skew-x-3"
                             style={{ textShadow: 'none' }}
@@ -142,7 +160,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
          <div className="bg-white/95 backdrop-blur-sm w-full max-w-md p-8 md:p-12 rounded-3xl shadow-2xl lg:shadow-none lg:bg-transparent relative z-10 border lg:border-none border-slate-100/50">
             
             <div className="mb-10 flex flex-col items-center lg:items-start">
-                {/* Mobile Logo (Updated Colors) */}
+                {/* Mobile Logo (Updated Colors & Animation) */}
                 <div className="lg:hidden flex flex-col items-center mb-6 select-none">
                     <div className="flex items-center text-5xl font-black tracking-tighter gap-1">
                         <span 
@@ -157,7 +175,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         >
                             AS
                         </span>
-                        <div className="ml-1 bg-blue-600 px-2 py-0 rounded-lg shadow-md border-b-4 border-blue-800">
+                        <div className="ml-1 bg-blue-600 px-2 py-0 rounded-lg shadow-md border-b-4 border-blue-800 tech-badge-normal">
                             <span className="text-white">TECH</span>
                         </div>
                     </div>
