@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Transaction, TransactionType, PayerOption, TransactionStatus } from '../types';
-import { CheckCircle2, Clock, AlertCircle, Plus, Trash2, Edit, Calendar, DollarSign, Tag, User, FileText, UserCheck, Lock, Layers } from 'lucide-react';
+import { CheckCircle2, Clock, AlertCircle, Plus, Trash2, Edit, Calendar, DollarSign, Tag, User, FileText, UserCheck, Lock, Layers, X } from 'lucide-react';
 import { Card } from './ui/Card';
 
 interface TransactionListProps {
@@ -337,212 +337,219 @@ export const TransactionList: React.FC<TransactionListProps> = ({
         )}
       </div>
 
-      {/* Modern Form */}
+      {/* Modern Form (MODAL OVERLAY) */}
       {showForm && !readOnly && (
-        <Card 
-            title={editingId ? "Editar Lançamento" : (isEntry ? "Nova Entrada" : "Nova Saída")} 
-            className={`border-t-4 ${isEntry ? 'border-t-green-500' : 'border-t-red-500'}`}
-            onBack={resetForm}
-        >
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+            {/* Click outside to close */}
+            <div className="absolute inset-0" onClick={resetForm}></div>
             
-            <div className="lg:col-span-2 group">
-               <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
-                 <Calendar size={14} /> {isEntry ? 'Data Entrada' : 'Vencimento'}
-               </label>
-               <input 
-                  type="date" 
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" 
-                  value={newTrans.date} 
-                  onChange={e => handleDueDateChange(e.target.value)} 
-                />
-            </div>
-
-            <div className="lg:col-span-4 group">
-               <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
-                 <User size={14} /> {isEntry ? 'Remetente' : 'Destinatário'}
-               </label>
-               <input 
-                  type="text" 
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" 
-                  placeholder={isEntry ? "Quem pagou?" : "Quem recebe?"}
-                  value={newTrans.entity} 
-                  onChange={e => setNewTrans({...newTrans, entity: e.target.value})} 
-                />
-            </div>
-
-            <div className="lg:col-span-3 group">
-               <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
-                 <FileText size={14} /> Descrição
-               </label>
-               <input 
-                  type="text" 
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" 
-                  placeholder="Descrição do lançamento" 
-                  value={newTrans.description} 
-                  onChange={e => setNewTrans({...newTrans, description: e.target.value})} 
-                />
-            </div>
-
-             <div className="lg:col-span-3 group">
-               <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
-                 <Tag size={14} /> Categoria (Análise)
-               </label>
-               <input 
-                  type="text" 
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" 
-                  placeholder="Ex: Aluguel, Vendas" 
-                  value={newTrans.category} 
-                  onChange={e => setNewTrans({...newTrans, category: e.target.value})} 
-                />
-            </div>
-
-            <div className="lg:col-span-3 group">
-               <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
-                 <DollarSign size={14} /> Valor {isInstallment ? 'TOTAL' : ''} (R$)
-               </label>
-               <div className="relative">
-                 <span className="absolute left-4 top-3.5 text-slate-400 font-bold">R$</span>
-                 <input 
-                    type="text" 
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold text-sm rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" 
-                    placeholder="0,00"
-                    // Formata para o padrão brasileiro visualmente
-                    value={newTrans.amount ? new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(newTrans.amount) : ''} 
-                    onChange={handleAmountChange} 
-                  />
-               </div>
-            </div>
-
-            <div className="lg:col-span-3 group">
-               <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
-                 <AlertCircle size={14} /> Status
-               </label>
-               <select 
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-                  value={newTrans.status}
-                  onChange={e => setNewTrans({...newTrans, status: e.target.value as TransactionStatus})}
-               >
-                 {isEntry ? (
-                    <>
-                        <option value="AGUARDANDO">Aguardando</option>
-                        <option value="PAGO">Pago</option>
-                        <option value="ATRASADO">Atrasado</option>
-                    </>
-                 ) : (
-                    <>
-                        <option value="PENDENTE">Pendente</option>
-                        <option value="PAGO">Pago</option>
-                        <option value="ATRASADO">Atrasado</option>
-                    </>
-                 )}
-               </select>
-            </div>
-
-            {!isEntry && (
-                <>
-                    <div className="lg:col-span-3 group">
-                        <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
-                            <UserCheck size={14} /> Responsável
-                        </label>
-                        <select 
-                            className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-                            value={newTrans.payer || ''}
-                            onChange={e => setNewTrans({...newTrans, payer: e.target.value as PayerOption})}
-                        >
-                            <option value="">Selecione...</option>
-                            <option value="Alex">Alex</option>
-                            <option value="André">André</option>
-                            <option value="Bruno">Bruno</option>
-                            <option value="Karol">Karol</option>
-                        </select>
-                    </div>
-                    <div className="lg:col-span-3 group">
-                        <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
-                            <Calendar size={14} /> Data Pagamento
-                        </label>
-                        <input 
-                            type="date" 
-                            className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" 
-                            value={newTrans.paymentDate || ''} 
-                            onChange={e => handlePaymentDateChange(e.target.value)} 
+            <div className="relative w-full max-w-5xl max-h-[90vh] overflow-y-auto custom-scrollbar rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200">
+                <Card 
+                    title={editingId ? "Editar Lançamento" : (isEntry ? "Nova Entrada" : "Nova Saída")} 
+                    className={`border-t-4 ${isEntry ? 'border-t-green-500' : 'border-t-red-500'}`}
+                    onBack={resetForm}
+                >
+                <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
+                    
+                    <div className="lg:col-span-2 group">
+                    <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
+                        <Calendar size={14} /> {isEntry ? 'Data Entrada' : 'Vencimento'}
+                    </label>
+                    <input 
+                        type="date" 
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" 
+                        value={newTrans.date} 
+                        onChange={e => handleDueDateChange(e.target.value)} 
                         />
                     </div>
 
-                    {/* Installment Toggle for Expenses */}
-                    {!editingId && (
-                        <div className="lg:col-span-12 bg-slate-50 p-4 rounded-xl border border-slate-200 mt-2 flex flex-col sm:flex-row gap-6 items-start sm:items-center">
-                            <div className="flex items-center gap-3">
-                                <label className="flex items-center cursor-pointer gap-2">
-                                    <input 
-                                        type="checkbox" 
-                                        className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                        checked={isInstallment}
-                                        onChange={(e) => setIsInstallment(e.target.checked)}
-                                    />
-                                    <span className="font-bold text-slate-700 flex items-center gap-2">
-                                        <Layers size={18} className="text-blue-500" />
-                                        Parcelado?
-                                    </span>
+                    <div className="lg:col-span-4 group">
+                    <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
+                        <User size={14} /> {isEntry ? 'Remetente' : 'Destinatário'}
+                    </label>
+                    <input 
+                        type="text" 
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" 
+                        placeholder={isEntry ? "Quem pagou?" : "Quem recebe?"}
+                        value={newTrans.entity} 
+                        onChange={e => setNewTrans({...newTrans, entity: e.target.value})} 
+                        />
+                    </div>
+
+                    <div className="lg:col-span-3 group">
+                    <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
+                        <FileText size={14} /> Descrição
+                    </label>
+                    <input 
+                        type="text" 
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" 
+                        placeholder="Descrição do lançamento" 
+                        value={newTrans.description} 
+                        onChange={e => setNewTrans({...newTrans, description: e.target.value})} 
+                        />
+                    </div>
+
+                    <div className="lg:col-span-3 group">
+                    <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
+                        <Tag size={14} /> Categoria (Análise)
+                    </label>
+                    <input 
+                        type="text" 
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" 
+                        placeholder="Ex: Aluguel, Vendas" 
+                        value={newTrans.category} 
+                        onChange={e => setNewTrans({...newTrans, category: e.target.value})} 
+                        />
+                    </div>
+
+                    <div className="lg:col-span-3 group">
+                    <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
+                        <DollarSign size={14} /> Valor {isInstallment ? 'TOTAL' : ''} (R$)
+                    </label>
+                    <div className="relative">
+                        <span className="absolute left-4 top-3.5 text-slate-400 font-bold">R$</span>
+                        <input 
+                            type="text" 
+                            className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold text-sm rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" 
+                            placeholder="0,00"
+                            // Formata para o padrão brasileiro visualmente
+                            value={newTrans.amount ? new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(newTrans.amount) : ''} 
+                            onChange={handleAmountChange} 
+                        />
+                    </div>
+                    </div>
+
+                    <div className="lg:col-span-3 group">
+                    <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
+                        <AlertCircle size={14} /> Status
+                    </label>
+                    <select 
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+                        value={newTrans.status}
+                        onChange={e => setNewTrans({...newTrans, status: e.target.value as TransactionStatus})}
+                    >
+                        {isEntry ? (
+                            <>
+                                <option value="AGUARDANDO">Aguardando</option>
+                                <option value="PAGO">Pago</option>
+                                <option value="ATRASADO">Atrasado</option>
+                            </>
+                        ) : (
+                            <>
+                                <option value="PENDENTE">Pendente</option>
+                                <option value="PAGO">Pago</option>
+                                <option value="ATRASADO">Atrasado</option>
+                            </>
+                        )}
+                    </select>
+                    </div>
+
+                    {!isEntry && (
+                        <>
+                            <div className="lg:col-span-3 group">
+                                <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
+                                    <UserCheck size={14} /> Responsável
                                 </label>
+                                <select 
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={newTrans.payer || ''}
+                                    onChange={e => setNewTrans({...newTrans, payer: e.target.value as PayerOption})}
+                                >
+                                    <option value="">Selecione...</option>
+                                    <option value="Alex">Alex</option>
+                                    <option value="André">André</option>
+                                    <option value="Bruno">Bruno</option>
+                                    <option value="Karol">Karol</option>
+                                </select>
                             </div>
-                            
-                            {isInstallment && (
-                                <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2">
-                                    <span className="text-sm font-medium text-slate-600">Quantidade:</span>
-                                    <div className="flex items-center">
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setInstallmentsCount(Math.max(2, installmentsCount - 1))}
-                                            className="w-8 h-8 flex items-center justify-center bg-white border border-slate-300 rounded-l-lg hover:bg-slate-100 font-bold"
-                                        >
-                                            -
-                                        </button>
-                                        <input 
-                                            type="number" 
-                                            min="2" 
-                                            max="36" 
-                                            value={installmentsCount}
-                                            onChange={(e) => setInstallmentsCount(Math.max(2, parseInt(e.target.value) || 2))}
-                                            className="w-14 h-8 text-center border-y border-slate-300 bg-blue-600 outline-none font-bold text-white" 
-                                        />
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setInstallmentsCount(installmentsCount + 1)}
-                                            className="w-8 h-8 flex items-center justify-center bg-white border border-slate-300 rounded-r-lg hover:bg-slate-100 font-bold"
-                                        >
-                                            +
-                                        </button>
+                            <div className="lg:col-span-3 group">
+                                <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
+                                    <Calendar size={14} /> Data Pagamento
+                                </label>
+                                <input 
+                                    type="date" 
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" 
+                                    value={newTrans.paymentDate || ''} 
+                                    onChange={e => handlePaymentDateChange(e.target.value)} 
+                                />
+                            </div>
+
+                            {/* Installment Toggle for Expenses */}
+                            {!editingId && (
+                                <div className="lg:col-span-12 bg-slate-50 p-4 rounded-xl border border-slate-200 mt-2 flex flex-col sm:flex-row gap-6 items-start sm:items-center">
+                                    <div className="flex items-center gap-3">
+                                        <label className="flex items-center cursor-pointer gap-2">
+                                            <input 
+                                                type="checkbox" 
+                                                className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                checked={isInstallment}
+                                                onChange={(e) => setIsInstallment(e.target.checked)}
+                                            />
+                                            <span className="font-bold text-slate-700 flex items-center gap-2">
+                                                <Layers size={18} className="text-blue-500" />
+                                                Parcelado?
+                                            </span>
+                                        </label>
                                     </div>
-                                    <span className="text-xs text-slate-400 ml-2">
-                                        {newTrans.amount ? `(${installmentsCount}x de ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(newTrans.amount) / installmentsCount)})` : ''}
-                                    </span>
+                                    
+                                    {isInstallment && (
+                                        <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2">
+                                            <span className="text-sm font-medium text-slate-600">Quantidade:</span>
+                                            <div className="flex items-center">
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => setInstallmentsCount(Math.max(2, installmentsCount - 1))}
+                                                    className="w-8 h-8 flex items-center justify-center bg-white border border-slate-300 rounded-l-lg hover:bg-slate-100 font-bold"
+                                                >
+                                                    -
+                                                </button>
+                                                <input 
+                                                    type="number" 
+                                                    min="2" 
+                                                    max="36" 
+                                                    value={installmentsCount}
+                                                    onChange={(e) => setInstallmentsCount(Math.max(2, parseInt(e.target.value) || 2))}
+                                                    className="w-14 h-8 text-center border-y border-slate-300 bg-blue-600 outline-none font-bold text-white" 
+                                                />
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => setInstallmentsCount(installmentsCount + 1)}
+                                                    className="w-8 h-8 flex items-center justify-center bg-white border border-slate-300 rounded-r-lg hover:bg-slate-100 font-bold"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
+                                            <span className="text-xs text-slate-400 ml-2">
+                                                {newTrans.amount ? `(${installmentsCount}x de ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(newTrans.amount) / installmentsCount)})` : ''}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             )}
-                        </div>
+                        </>
                     )}
-                </>
-            )}
 
-            <div className="lg:col-span-12 flex justify-end gap-3 mt-2">
-               <button 
-                  type="button" 
-                  onClick={resetForm}
-                  disabled={isSubmitting}
-                  className="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-colors disabled:opacity-50"
-               >
-                 Cancelar
-               </button>
-               <button 
-                  type="submit" 
-                  disabled={isSubmitting}
-                  className={`text-white px-8 py-3 rounded-xl font-bold shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed ${isEntry ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
-                >
-                 {isSubmitting ? "Salvando..." : (editingId ? "Atualizar" : "Salvar")}
-               </button>
+                    <div className="lg:col-span-12 flex justify-end gap-3 mt-2">
+                    <button 
+                        type="button" 
+                        onClick={resetForm}
+                        disabled={isSubmitting}
+                        className="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-colors disabled:opacity-50"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        type="submit" 
+                        disabled={isSubmitting}
+                        className={`text-white px-8 py-3 rounded-xl font-bold shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed ${isEntry ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                        >
+                        {isSubmitting ? "Salvando..." : (editingId ? "Atualizar" : "Salvar")}
+                    </button>
+                    </div>
+                </form>
+                </Card>
             </div>
-          </form>
-        </Card>
+        </div>
       )}
 
       {/* Modern Table - Compact Layout */}
