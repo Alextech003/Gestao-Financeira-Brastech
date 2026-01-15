@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Transaction, TransactionType, PayerOption, TransactionStatus } from '../types';
-import { CheckCircle2, Clock, AlertCircle, Plus, Trash2, Edit, Calendar, DollarSign, Tag, User, FileText, UserCheck, Lock, Layers, X } from 'lucide-react';
+import { CheckCircle2, Clock, AlertCircle, Plus, Trash2, Edit, Calendar, DollarSign, Tag, User, FileText, UserCheck, Lock, Layers, X, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { Card } from './ui/Card';
 
 interface TransactionListProps {
@@ -17,14 +17,52 @@ interface TransactionListProps {
 export const TransactionList: React.FC<TransactionListProps> = ({ 
   type, transactions, onAddTransaction, onUpdateTransaction, onUpdateStatus, onDelete, readOnly = false
 }) => {
-  // Ordenar (Mais novos primeiro) e Agrupar por dia
-  const groupedTransactions = useMemo(() => {
-    // 1. Filtrar pelo tipo e Ordenar decrescente (data mais nova em cima)
-    const sorted = transactions
-      .filter(t => t.type === type)
-      .sort((a, b) => b.date.localeCompare(a.date)); // String comparison is safer for YYYY-MM-DD
+  // Estado para controlar o Mês de Visualização (Padrão: Hoje)
+  const [viewDate, setViewDate] = useState(new Date());
 
-    // 2. Agrupar
+  // Funções de Navegação de Data
+  const nextMonth = () => {
+    setViewDate(prev => {
+        const next = new Date(prev);
+        next.setMonth(prev.getMonth() + 1);
+        return next;
+    });
+  };
+
+  const prevMonth = () => {
+    setViewDate(prev => {
+        const prevDate = new Date(prev);
+        prevDate.setMonth(prev.getMonth() - 1);
+        return prevDate;
+    });
+  };
+
+  // Helper para nome do mês
+  const getMonthName = (date: Date) => {
+    return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  };
+
+  // Ordenar (Mais novos primeiro), Filtrar por Mês Selecionado e Agrupar por dia
+  const groupedTransactions = useMemo(() => {
+    const targetMonth = viewDate.getMonth(); // 0-11
+    const targetYear = viewDate.getFullYear();
+
+    // 1. Filtrar pelo tipo e PELO MÊS/ANO SELECIONADO
+    const filtered = transactions.filter(t => {
+        if (t.type !== type) return false;
+
+        // Parse da data da transação (YYYY-MM-DD)
+        const parts = t.date.split('-');
+        const tYear = parseInt(parts[0]);
+        const tMonth = parseInt(parts[1]) - 1; // Ajuste para 0-index
+
+        return tYear === targetYear && tMonth === targetMonth;
+    });
+
+    // 2. Ordenar decrescente (data mais nova em cima)
+    const sorted = filtered.sort((a, b) => b.date.localeCompare(a.date));
+
+    // 3. Agrupar
     const groups: { date: string; items: Transaction[] }[] = [];
     
     sorted.forEach(t => {
@@ -37,7 +75,14 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     });
 
     return groups;
-  }, [transactions, type]);
+  }, [transactions, type, viewDate]);
+
+  // Cálculo do Total do Mês Selecionado
+  const monthTotal = useMemo(() => {
+      return groupedTransactions.reduce((acc, group) => {
+          return acc + group.items.reduce((sum, item) => sum + Number(item.amount), 0);
+      }, 0);
+  }, [groupedTransactions]);
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -335,6 +380,40 @@ export const TransactionList: React.FC<TransactionListProps> = ({
             <span>{isEntry ? "Nova Entrada" : "Nova Saída"}</span>
             </button>
         )}
+      </div>
+
+      {/* Month Navigation & Filter Bar */}
+      <div className="bg-white rounded-2xl shadow-md p-3 flex flex-col sm:flex-row items-center justify-between gap-4 border border-slate-100">
+         {/* Navigation */}
+         <div className="flex items-center gap-4 bg-slate-50 p-2 rounded-xl">
+            <button 
+                onClick={prevMonth}
+                className="p-2 rounded-lg hover:bg-white hover:shadow-sm transition-all text-slate-500 hover:text-slate-800"
+            >
+                <ChevronLeft size={20} />
+            </button>
+            
+            <div className="flex items-center gap-2 min-w-[180px] justify-center text-slate-800 font-black uppercase tracking-wide select-none">
+                <Calendar size={16} className={isEntry ? 'text-green-500' : 'text-red-500'} />
+                {getMonthName(viewDate)}
+            </div>
+
+            <button 
+                onClick={nextMonth}
+                className="p-2 rounded-lg hover:bg-white hover:shadow-sm transition-all text-slate-500 hover:text-slate-800"
+            >
+                <ChevronRight size={20} />
+            </button>
+         </div>
+
+         {/* Monthly Total */}
+         <div className={`flex items-center gap-3 px-6 py-3 rounded-xl font-bold border ${isEntry ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+             <div className="flex flex-col items-end leading-tight">
+                 <span className="text-[10px] opacity-70 uppercase tracking-widest">Total {isEntry ? 'Recebido' : 'Devido'}</span>
+                 <span className="text-xl">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(monthTotal)}</span>
+             </div>
+             <Filter size={24} className="opacity-20" />
+         </div>
       </div>
 
       {/* Modern Form (MODAL OVERLAY) */}
@@ -762,8 +841,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                 <tr>
                   <td colSpan={readOnly ? (isEntry ? 5 : 7) : (isEntry ? 6 : 8)} className="px-6 py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
-                        <DollarSign size={40} className="opacity-20" />
-                        <p>Nenhum lançamento encontrado.</p>
+                        <Calendar size={40} className="opacity-20 mb-2" />
+                        <p className="font-bold">Nenhum lançamento neste mês.</p>
+                        <p className="text-xs">Mude o mês na navegação acima para ver outros registros.</p>
                     </div>
                   </td>
                 </tr>
