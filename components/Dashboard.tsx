@@ -101,10 +101,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
       }
     });
 
-    // Calcula saldos finais
-    data.forEach(m => {
-      m.Saldo = m.Entrada - m.Saida;
-    });
+    // Calcula saldos finais com lógica acumulativa (Carry Over)
+    // O saldo de um mês é somado à Entrada do mês seguinte para manter o fluxo de caixa contínuo
+    for (let i = 0; i < 12; i++) {
+        if (i > 0) {
+            // Adiciona o saldo do mês anterior à entrada deste mês
+            data[i].Entrada += data[i-1].Saldo;
+        }
+        // Recalcula o saldo
+        data[i].Saldo = data[i].Entrada - data[i].Saida;
+    }
 
     return data;
   }, [transactions, selectedYear, previousBalance]);
