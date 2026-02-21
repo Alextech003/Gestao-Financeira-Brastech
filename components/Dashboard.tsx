@@ -91,7 +91,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
           const type = t.type?.toUpperCase();
           
           if (type === 'ENTRADA') {
-              data[month].Entrada += amount;
+              // FILTRO: Só soma nas análises se estiver PAGO (Solicitação do usuário)
+              if (t.status === 'PAGO') {
+                data[month].Entrada += amount;
+              }
           } else if (type === 'SAIDA') {
               // FILTRO: Só soma nas análises se estiver PAGO
               if (t.status === 'PAGO') {
@@ -166,8 +169,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
             const category = t.category || 'Geral';
 
             if (type === 'ENTRADA') {
-                incomeByCategory[category] = (incomeByCategory[category] || 0) + amount;
-                totalIncome += amount;
+                // FILTRO: Só soma nas análises se estiver PAGO
+                if (t.status === 'PAGO') {
+                    incomeByCategory[category] = (incomeByCategory[category] || 0) + amount;
+                    totalIncome += amount;
+                }
             } else if (type === 'SAIDA') {
                 // FILTRO: Só soma nas análises se estiver PAGO
                 if (t.status === 'PAGO') {
