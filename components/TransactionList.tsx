@@ -439,7 +439,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                     
                     <div className="lg:col-span-2 group">
                     <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
-                        <Calendar size={14} /> {isEntry ? 'Data Entrada' : 'Vencimento'}
+                        <Calendar size={14} /> {title === 'Contas Pendentes' ? 'Data Saída' : (isEntry ? 'Data Entrada' : 'Vencimento')}
                     </label>
                     <input 
                         type="date" 
@@ -510,9 +510,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                         <AlertCircle size={14} /> Status
                     </label>
                     <select 
-                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                         value={newTrans.status}
                         onChange={e => setNewTrans({...newTrans, status: e.target.value as TransactionStatus})}
+                        disabled={title === 'Contas Pendentes' && !editingId}
                     >
                         {isEntry ? (
                             <>
@@ -721,19 +722,30 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                                             {t.status}
                                         </span>
                                     ) : (
-                                        <div className="relative inline-block">
-                                            <select 
-                                                value={t.status}
-                                                onChange={(e) => onUpdateStatus(t.id, e.target.value as TransactionStatus)}
-                                                className={`appearance-none cursor-pointer pl-2 pr-6 py-0.5 rounded-full text-[10px] font-bold border focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-400 ${getStatusColor(t.status)}`}
-                                            >
-                                                <option value="AGUARDANDO">Aguardando</option>
-                                                <option value="PAGO">Pago</option>
-                                                <option value="ATRASADO">Atrasado</option>
-                                            </select>
-                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-current opacity-60">
-                                                <svg className="fill-current h-2 w-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                                        <div className="flex items-center justify-center gap-2">
+                                            <div className="relative inline-block">
+                                                <select 
+                                                    value={t.status}
+                                                    onChange={(e) => onUpdateStatus(t.id, e.target.value as TransactionStatus)}
+                                                    className={`appearance-none cursor-pointer pl-2 pr-6 py-0.5 rounded-full text-[10px] font-bold border focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-400 ${getStatusColor(t.status)}`}
+                                                >
+                                                    <option value="AGUARDANDO">Aguardando</option>
+                                                    <option value="PAGO">Pago</option>
+                                                    <option value="ATRASADO">Atrasado</option>
+                                                </select>
+                                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-current opacity-60">
+                                                    <svg className="fill-current h-2 w-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                                                </div>
                                             </div>
+                                            {title === 'Contas Pendentes' && t.status !== 'PAGO' && (
+                                                <button
+                                                    onClick={() => onUpdateStatus(t.id, 'PAGO')}
+                                                    className="px-2 py-0.5 bg-green-500 hover:bg-green-600 text-white text-[10px] font-bold rounded-full transition-colors shadow-sm flex items-center gap-1"
+                                                    title="Marcar como Pago"
+                                                >
+                                                    <CheckCircle2 size={10} /> Pago
+                                                </button>
+                                            )}
                                         </div>
                                     )}
                                 </td>

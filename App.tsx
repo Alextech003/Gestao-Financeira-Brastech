@@ -205,11 +205,9 @@ function App() {
         {activeTab === 'receivables' && (
           <TransactionList 
             type="ENTRADA" 
-            statusFilter={['PAGO']}
-            defaultStatus="PAGO"
-            title="Entradas (Pagas)"
-            subtitle="Histórico de recebimentos já concluídos."
-            buttonLabel="Nova Entrada Paga"
+            title="Entradas"
+            subtitle="Histórico de todos os recebimentos."
+            buttonLabel="Nova Entrada"
             transactions={transactions} 
             onAddTransaction={addTransaction} 
             onUpdateTransaction={updateTransaction}
