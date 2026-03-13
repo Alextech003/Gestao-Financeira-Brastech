@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, ArrowDownCircle, ArrowUpCircle, Users, Sparkles, ShieldCheck } from 'lucide-react';
+import { BarChart3, ArrowDownCircle, ArrowUpCircle, Users, Sparkles, ShieldCheck, Clock } from 'lucide-react';
 import { User } from '../types';
 
 interface NavbarProps {
@@ -12,10 +12,10 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, current
   const navItems = [
     { id: 'dashboard', label: 'ANÁLISES', icon: BarChart3 },
     { id: 'receivables', label: 'ENTRADAS', icon: ArrowUpCircle },
+    { id: 'pendentes', label: 'PENDENTES', icon: Clock },
     { id: 'payables', label: 'SAÍDAS', icon: ArrowDownCircle },
     { id: 'clients', label: 'CLIENTES', icon: Users },
     { id: 'users', label: 'USUÁRIOS', icon: ShieldCheck },
-    { id: 'ai-editor', label: 'IA EDITOR', icon: Sparkles },
   ];
 
   // Estilos de animação inline para o efeito de tráfego e logo giratória

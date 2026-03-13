@@ -205,6 +205,28 @@ function App() {
         {activeTab === 'receivables' && (
           <TransactionList 
             type="ENTRADA" 
+            statusFilter={['PAGO']}
+            defaultStatus="PAGO"
+            title="Entradas (Pagas)"
+            subtitle="Histórico de recebimentos já concluídos."
+            buttonLabel="Nova Entrada Paga"
+            transactions={transactions} 
+            onAddTransaction={addTransaction} 
+            onUpdateTransaction={updateTransaction}
+            onUpdateStatus={updateStatus}
+            onDelete={deleteTransaction}
+            readOnly={activeUser.role === 'VIEWER'}
+          />
+        )}
+
+        {activeTab === 'pendentes' && (
+          <TransactionList 
+            type="ENTRADA" 
+            statusFilter={['PENDENTE', 'AGUARDANDO', 'ATRASADO']}
+            defaultStatus="AGUARDANDO"
+            title="Contas Pendentes"
+            subtitle="Dívidas e valores a receber. Ao marcar como Pago, vai para Entradas."
+            buttonLabel="Novo a Receber"
             transactions={transactions} 
             onAddTransaction={addTransaction} 
             onUpdateTransaction={updateTransaction}
@@ -247,7 +269,6 @@ function App() {
             />
         )}
 
-        {activeTab === 'ai-editor' && <GeminiEditor />}
       </main>
     </div>
   );

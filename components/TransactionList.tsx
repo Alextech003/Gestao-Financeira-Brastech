@@ -12,10 +12,16 @@ interface TransactionListProps {
   onUpdateStatus: (id: string, status: TransactionStatus) => void;
   onDelete: (id: string) => void;
   readOnly?: boolean; // New prop for Access Control
+  statusFilter?: TransactionStatus[];
+  defaultStatus?: TransactionStatus;
+  title?: string;
+  subtitle?: string;
+  buttonLabel?: string;
 }
 
 export const TransactionList: React.FC<TransactionListProps> = ({ 
-  type, transactions, onAddTransaction, onUpdateTransaction, onUpdateStatus, onDelete, readOnly = false
+  type, transactions, onAddTransaction, onUpdateTransaction, onUpdateStatus, onDelete, readOnly = false,
+  statusFilter, defaultStatus, title, subtitle, buttonLabel
 }) => {
   // Estado para controlar o Mês de Visualização (Padrão: Hoje)
   const [viewDate, setViewDate] = useState(new Date());
@@ -47,9 +53,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     const targetMonth = viewDate.getMonth(); // 0-11
     const targetYear = viewDate.getFullYear();
 
-    // 1. Filtrar pelo tipo e PELO MÊS/ANO SELECIONADO
+    // 1. Filtrar pelo tipo, status (se fornecido) e PELO MÊS/ANO SELECIONADO
     const filtered = transactions.filter(t => {
         if (t.type !== type) return false;
+        if (statusFilter && !statusFilter.includes(t.status)) return false;
 
         // Parse da data da transação (YYYY-MM-DD)
         const parts = t.date.split('-');
@@ -111,7 +118,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     entity: '',
     amount: 0,
     category: 'Geral',
-    status: isEntry ? 'AGUARDANDO' : 'PENDENTE',
+    status: defaultStatus || (isEntry ? 'AGUARDANDO' : 'PENDENTE'),
     payer: undefined,
     paymentDate: ''
   });
@@ -146,7 +153,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
       entity: '',
       amount: 0,
       category: 'Geral',
-      status: isEntry ? 'AGUARDANDO' : 'PENDENTE',
+      status: defaultStatus || (isEntry ? 'AGUARDANDO' : 'PENDENTE'),
       payer: undefined,
       paymentDate: ''
     });
@@ -356,7 +363,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
         <div>
            <div className="flex items-center gap-3">
               <h2 className={`text-3xl font-black tracking-tight ${isEntry ? 'text-green-700' : 'text-red-700'}`}>
-                {isEntry ? 'Entradas' : 'Saídas'}
+                {title || (isEntry ? 'Entradas' : 'Saídas')}
               </h2>
               {readOnly && (
                 <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-bold border border-slate-200 flex items-center gap-1">
@@ -365,7 +372,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
               )}
            </div>
           <p className="text-slate-500 text-sm mt-1">
-            {isEntry ? 'Gerencie recebimentos e contas a receber.' : 'Controle despesas e contas a pagar.'}
+            {subtitle || (isEntry ? 'Gerencie recebimentos e contas a receber.' : 'Controle despesas e contas a pagar.')}
           </p>
         </div>
        
@@ -377,7 +384,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
             <div className="bg-white/20 p-1 rounded-lg group-hover:bg-white/30 transition-colors">
                 <Plus size={20} /> 
             </div>
-            <span>{isEntry ? "Nova Entrada" : "Nova Saída"}</span>
+            <span>{buttonLabel || (isEntry ? "Nova Entrada" : "Nova Saída")}</span>
             </button>
         )}
       </div>
@@ -424,7 +431,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
             
             <div className="relative w-full max-w-5xl max-h-[90vh] overflow-y-auto custom-scrollbar rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200">
                 <Card 
-                    title={editingId ? "Editar Lançamento" : (isEntry ? "Nova Entrada" : "Nova Saída")} 
+                    title={editingId ? "Editar Lançamento" : (title ? `Nova ${title}` : (isEntry ? "Nova Entrada" : "Nova Saída"))} 
                     className={`border-t-4 ${isEntry ? 'border-t-green-500' : 'border-t-red-500'}`}
                     onBack={resetForm}
                 >
