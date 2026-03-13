@@ -451,12 +451,12 @@ export const TransactionList: React.FC<TransactionListProps> = ({
 
                     <div className="lg:col-span-4 group">
                     <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
-                        <User size={14} /> {isEntry ? 'Remetente' : 'Destinatário'}
+                        <User size={14} /> {title === 'Contas Pendentes' ? 'Quem Pegou' : (isEntry ? 'Remetente' : 'Destinatário')}
                     </label>
                     <input 
                         type="text" 
                         className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" 
-                        placeholder={isEntry ? "Quem pagou?" : "Quem recebe?"}
+                        placeholder={title === 'Contas Pendentes' ? "Quem pegou?" : (isEntry ? "Quem pagou?" : "Quem recebe?")}
                         value={newTrans.entity} 
                         onChange={e => setNewTrans({...newTrans, entity: e.target.value})} 
                         />
@@ -649,7 +649,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                     // Headers for Contas a Receber
                     <>
                         <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider first:rounded-tl-2xl">Data</th>
-                        <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider">Remetente</th>
+                        <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider">{title === 'Contas Pendentes' ? 'Quem Pegou' : 'Remetente'}</th>
                         <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider">Valor</th>
                         <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider w-1/3">Descrição</th>
                         <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider">Status</th>
