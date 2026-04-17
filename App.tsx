@@ -8,7 +8,7 @@ import { GeminiEditor } from './components/GeminiEditor';
 import { Login } from './components/Login'; 
 import { db } from './services/database'; 
 import { Transaction, Client, TransactionStatus, User } from './types';
-import { LogOut, Loader2 } from 'lucide-react';
+import { LogOut, Loader2, ShieldCheck } from 'lucide-react';
 
 function App() {
   // Auth State
@@ -21,6 +21,7 @@ function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [dbConnected, setDbConnected] = useState(true);
 
   // 1. Check Login on Mount
   useEffect(() => {
@@ -44,8 +45,10 @@ function App() {
         setTransactions(tData);
         setClients(cData);
         setUsers(uData);
+        setDbConnected(true);
     } catch (error) {
         console.error("Erro ao carregar dados:", error);
+        setDbConnected(false);
     } finally {
         setLoadingData(false);
     }
@@ -110,36 +113,59 @@ function App() {
         }
 
         // If DB returned null (error logged there), we throw here to notify UI
-        if (!result) throw new Error("Falha ao salvar no banco de dados.");
+        if (!result) throw new Error("Falha ao salvar no banco de dados. Verifique sua conexão.");
 
-        await loadData(); // Reload to get the real ID from DB
-    } catch (error) {
+        await loadData();
+        setDbConnected(true);
+    } catch (error: any) {
         console.error("Erro ao salvar transação:", error);
-        throw error; // Propagate error so Form doesn't close
+        alert(`❌ ERRO AO SALVAR: ${error.message || 'Verifique sua internet ou se o banco de dados está pausado.'}`);
+        setDbConnected(false);
+        throw error;
     } finally {
         setLoadingData(false);
     }
   };
 
   const updateTransaction = async (updatedT: Transaction) => {
-    // Optimistic update for UI speed
-    setTransactions(prev => prev.map(t => t.id === updatedT.id ? updatedT : t));
-    await db.updateTransaction(updatedT);
-    await loadData(); // Sync to be sure
+    try {
+        setTransactions(prev => prev.map(t => t.id === updatedT.id ? updatedT : t));
+        const success = await db.updateTransaction(updatedT);
+        if (!success) throw new Error("Erro na atualização");
+        setDbConnected(true);
+    } catch (error) {
+        setDbConnected(false);
+        alert("❌ Falha ao sincronizar alteração. Verifique a conexão.");
+    }
+    await loadData();
   };
 
   const updateStatus = async (id: string, status: TransactionStatus) => {
     const t = transactions.find(tr => tr.id === id);
     if (t) {
-        const updated = { ...t, status };
-        setTransactions(prev => prev.map(tr => tr.id === id ? updated : tr));
-        await db.updateTransaction(updated);
+        try {
+            const updated = { ...t, status };
+            setTransactions(prev => prev.map(tr => tr.id === id ? updated : tr));
+            const success = await db.updateTransaction(updated);
+            if (!success) throw new Error("Erro");
+            setDbConnected(true);
+        } catch (error) {
+            setDbConnected(false);
+            alert("❌ Falha ao atualizar status.");
+        }
     }
   };
 
   const deleteTransaction = async (id: string) => {
-    setTransactions(prev => prev.filter(t => t.id !== id));
-    await db.deleteTransaction(id);
+    try {
+        setTransactions(prev => prev.filter(t => t.id !== id));
+        const success = await db.deleteTransaction(id);
+        if (!success) throw new Error("Erro");
+        setDbConnected(true);
+    } catch (error) {
+        setDbConnected(false);
+        alert("❌ Falha ao excluir.");
+    }
   };
 
   // Clients Logic
@@ -184,12 +210,14 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-100 font-sans text-gray-900">
-      <Navbar activeTab={activeTab} setActiveTab={setActiveTab} currentUser={activeUser} />
+      <Navbar activeTab={activeTab} setActiveTab={setActiveTab} currentUser={activeUser} dbConnected={dbConnected} onRetry={loadData} />
       
       {/* Logout Bar */}
       <div className="bg-slate-900 text-white text-xs py-1 px-4 flex justify-between items-center">
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-4 items-center">
              {loadingData && <span className="flex items-center gap-1 text-yellow-400"><Loader2 size={10} className="animate-spin"/> Sincronizando...</span>}
+             {!dbConnected && <span className="flex items-center gap-1 text-red-400 font-bold border border-red-400/30 px-2 rounded">⚠️ FORA DE LINHA</span>}
+             {dbConnected && !loadingData && <span className="flex items-center gap-1 text-green-400 opacity-50"><ShieldCheck size={10}/> Conectado</span>}
         </div>
         <div className="flex items-center gap-4">
             <span>Logado como: <strong>{activeUser.name}</strong></span>

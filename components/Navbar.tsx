@@ -6,9 +6,11 @@ interface NavbarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   currentUser: User | null;
+  dbConnected: boolean;
+  onRetry?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, currentUser }) => {
+export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, currentUser, dbConnected, onRetry }) => {
   const navItems = [
     { id: 'dashboard', label: 'ANÁLISES', icon: BarChart3 },
     { id: 'receivables', label: 'ENTRADAS', icon: ArrowUpCircle },
@@ -127,8 +129,17 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, current
                     </span>
                 </div>
              </div>
-             <span className="text-[0.6rem] md:text-xs font-bold text-blue-300 tracking-[0.3em] mt-1 uppercase opacity-90 drop-shadow-md">
+             <span className="text-[0.6rem] md:text-xs font-bold text-blue-300 tracking-[0.3em] mt-1 uppercase opacity-90 drop-shadow-md flex items-center gap-2">
                 Rastreamento Veicular
+                {!dbConnected && (
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); onRetry?.(); }}
+                        className="bg-red-500 hover:bg-red-600 text-white text-[8px] px-1.5 py-0.5 rounded animate-pulse transition-colors"
+                        title="Tentar Reconectar"
+                    >
+                        OFFLINE (RECONECTAR?)
+                    </button>
+                )}
              </span>
           </div>
 
