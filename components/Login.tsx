@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../services/database';
 import { User } from '../types';
 import { Lock, User as UserIcon, ArrowRight, Loader2, TrendingUp, ShieldCheck, MapPin } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 interface LoginProps {
   onLoginSuccess: (user: User) => void;

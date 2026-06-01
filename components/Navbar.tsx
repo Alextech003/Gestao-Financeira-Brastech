@@ -14,9 +14,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, current
   const navItems = [
     { id: 'dashboard', label: 'ANÁLISES', icon: BarChart3 },
     { id: 'receivables', label: 'ENTRADAS', icon: ArrowUpCircle },
-    { id: 'pendentes', label: 'PENDENTES', icon: Clock },
     { id: 'payables', label: 'SAÍDAS', icon: ArrowDownCircle },
-    { id: 'clients', label: 'CLIENTES', icon: Users },
     { id: 'users', label: 'USUÁRIOS', icon: ShieldCheck },
   ];
 

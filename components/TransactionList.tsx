@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Transaction, TransactionType, PayerOption, TransactionStatus } from '../types';
-import { CheckCircle2, Clock, AlertCircle, Plus, Trash2, Edit, Calendar, DollarSign, Tag, User, FileText, UserCheck, Lock, Layers, X, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { CheckCircle2, Clock, AlertCircle, Plus, Trash2, Edit, Calendar, DollarSign, Tag, User, FileText, UserCheck, Lock, Layers, X, ChevronLeft, ChevronRight, Filter, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { Card } from './ui/Card';
 
 interface TransactionListProps {
@@ -55,15 +55,30 @@ export const TransactionList: React.FC<TransactionListProps> = ({
 
     // 1. Filtrar pelo tipo, status (se fornecido) e PELO MÊS/ANO SELECIONADO
     const filtered = transactions.filter(t => {
-        if (t.type !== type) return false;
+        const tType = t.type?.toUpperCase();
+        if (tType !== type?.toUpperCase()) return false;
         if (statusFilter && !statusFilter.includes(t.status)) return false;
 
-        // Parse da data da transação (YYYY-MM-DD)
-        const parts = t.date.split('-');
-        const tYear = parseInt(parts[0]);
-        const tMonth = parseInt(parts[1]) - 1; // Ajuste para 0-index
+        // Parse da data da transação (YYYY-MM-DD ou ISO)
+        try {
+            if (!t.date) return false;
+            let year, month;
+            
+            if (t.date.includes('-')) {
+                const cleanDate = t.date.split('T')[0];
+                const parts = cleanDate.split('-');
+                year = parseInt(parts[0], 10);
+                month = parseInt(parts[1], 10) - 1;
+            } else {
+                const d = new Date(t.date);
+                year = d.getFullYear();
+                month = d.getMonth();
+            }
 
-        return tYear === targetYear && tMonth === targetMonth;
+            return year === targetYear && month === targetMonth;
+        } catch (e) {
+            return false;
+        }
     });
 
     // 2. Ordenar decrescente (data mais nova em cima)
@@ -639,237 +654,160 @@ export const TransactionList: React.FC<TransactionListProps> = ({
         </div>
       )}
 
-      {/* Modern Table - Compact Layout */}
-      <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
-        <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead>
-              <tr className={`${headerGradient} text-white text-left`}>
-                {isEntry ? (
-                    // Headers for Contas a Receber
-                    <>
-                        <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider first:rounded-tl-2xl">Data</th>
-                        <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider">{title === 'Contas Pendentes' ? 'Quem Pegou' : 'Remetente'}</th>
-                        <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider">Valor</th>
-                        <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider w-1/3">Descrição</th>
-                        <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider">Status</th>
-                        {!readOnly && <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider last:rounded-tr-2xl">Ações</th>}
-                    </>
-                ) : (
-                    // Headers for Contas a Pagar
-                    <>
-                        <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider first:rounded-tl-2xl">Vencimento</th>
-                        <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider">Destinatário</th>
-                        <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider w-1/3">Descrição</th>
-                        <th className="px-3 py-3 text-xs font-extrabold uppercase tracking-wider">Valor</th>
-                        <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider">Status</th>
-                        <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider">Data de Pagamento</th>
-                        <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider">Responsável</th>
-                        {!readOnly && <th className="px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider last:rounded-tr-2xl">Ações</th>}
-                    </>
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {groupedTransactions.map((group) => (
-                <React.Fragment key={group.date}>
-                    {/* Linha Separadora de Data - ESTILO PÍLULA FLUTUANTE (ATUALIZADO) */}
-                    <tr>
-                        <td colSpan={10} className="p-0 border-none">
-                            <div className="relative h-14 flex items-center justify-center my-1">
-                                {/* Linha de fundo */}
-                                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[1px] bg-blue-100/80"></div>
-                                
-                                {/* Pílula Central */}
-                                <div className="relative z-10 bg-blue-600 border border-blue-500 rounded-full px-6 py-1.5 flex items-center gap-3 shadow-md">
-                                    <div className="flex items-center gap-2">
-                                        <Calendar size={14} className="text-white" />
-                                        <span className="font-bold text-white text-xs uppercase tracking-wide">
-                                            {formatFullDate(group.date)}
-                                        </span>
-                                    </div>
-                                    <span className="text-blue-300 text-[10px]">•</span>
-                                    <span className="font-bold text-white text-xs uppercase tracking-wide">
-                                        {formatWeekday(group.date)}
-                                    </span>
-                                </div>
+      {/* Modern Card List Layout */}
+      <div className="space-y-6 flex flex-col items-center">
+          {groupedTransactions.length === 0 ? (
+            <div className="w-full bg-white rounded-3xl shadow-sm border border-slate-100 py-20 text-center flex flex-col items-center justify-center">
+                <Clock size={48} className="text-slate-200 mb-4" />
+                <p className="font-bold text-xl text-slate-700">Nenhum lançamento encontrado</p>
+                <p className="text-sm font-medium text-slate-500 mt-2">Tente mudar o mês de visualização ou adicione um novo registro.</p>
+            </div>
+          ) : (
+            groupedTransactions.map((group) => (
+                <div key={group.date} className="w-full max-w-5xl">
+                    {/* Date Pill Separator */}
+                    <div className="relative h-14 flex items-center justify-center mb-4 mt-2">
+                        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[1px] bg-slate-200/50"></div>
+                        <div className="relative z-10 bg-white border border-slate-200/80 rounded-full px-6 py-2 flex items-center gap-3 shadow-sm">
+                            <div className="flex items-center gap-2">
+                                <Calendar size={14} className="text-slate-500" />
+                                <span className="font-bold text-slate-700 text-xs uppercase tracking-wider">
+                                    {formatFullDate(group.date)}
+                                </span>
                             </div>
-                        </td>
-                    </tr>
-                    
-                    {/* Itens do grupo */}
-                    {group.items.map(t => (
-                        <tr key={t.id} className="group hover:bg-blue-50/30 transition-colors duration-200">
-                        
-                        {isEntry ? (
-                            // Row for Contas a Receber
-                            <>
-                                <td className="px-3 py-2 whitespace-nowrap text-xs text-slate-400">
-                                    {formatShortDate(t.date)}
-                                </td>
-                                <td className="px-3 py-2 whitespace-nowrap text-sm font-bold text-slate-800">
-                                    {t.entity}
-                                </td>
-                                <td className="px-3 py-2 whitespace-nowrap text-sm font-bold text-green-700">
-                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.amount)}
-                                </td>
-                                <td className="px-3 py-2 text-xs text-slate-500 whitespace-normal break-words">
-                                    {t.description}
-                                </td>
-                                <td className="px-3 py-2 whitespace-nowrap text-center">
-                                    {readOnly ? (
-                                        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusColor(t.status)}`}>
-                                            {t.status}
+                            <span className="text-slate-300 text-[10px]">•</span>
+                            <span className="font-bold text-slate-500 text-xs uppercase tracking-wider">
+                                {formatWeekday(group.date)}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Transaction Cards Grid/List */}
+                    <div className="grid grid-cols-1 gap-3">
+                        {group.items.map(t => (
+                            <div key={t.id} className="group relative bg-white flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-slate-300/50 transition-all duration-300">
+                                
+                                {/* Left: Info */}
+                                <div className="flex items-center gap-4 flex-1">
+                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm shrink-0 ${isEntry ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+                                        {isEntry ? <ArrowUpCircle size={24} strokeWidth={2.5} /> : <ArrowDownCircle size={24} strokeWidth={2.5} />}
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <h4 className="font-bold text-slate-900 text-base">{t.entity}</h4>
+                                        <p className="text-sm font-medium text-slate-500 flex items-center gap-2 mt-0.5">
+                                            {t.description}
+                                            {t.installmentCurrent && t.installmentTotal && (
+                                                <span className="inline-flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 font-bold text-[10px] border border-slate-200">
+                                                    <Layers size={10} /> {t.installmentCurrent}/{t.installmentTotal}
+                                                </span>
+                                            )}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Center: Amounts & Status */}
+                                <div className="flex items-center gap-6 md:gap-8 bg-slate-50/50 p-3 rounded-xl md:p-0 md:bg-transparent">
+                                    <div className="flex flex-col md:items-end">
+                                        <span className={`font-black text-lg tracking-tight ${isEntry ? 'text-green-600' : 'text-red-500'}`}>
+                                            {isEntry ? '+' : '-'}{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.amount)}
                                         </span>
-                                    ) : (
-                                        <div className="flex items-center justify-center gap-2">
-                                            <div className="relative inline-block">
+                                        {!isEntry && t.payer && (
+                                            <span className="text-[10px] uppercase font-bold text-slate-400 mt-0.5 tracking-wider">
+                                                Resp: {t.payer}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Actionable Status Pill */}
+                                    <div className="flex flex-col justify-center min-w-[110px]">
+                                        {readOnly ? (
+                                            <span className={`inline-flex justify-center px-3 py-1 rounded-full text-xs font-bold border ${getStatusColor(t.status)}`}>
+                                                {t.status}
+                                            </span>
+                                        ) : (
+                                            <div className="relative">
                                                 <select 
                                                     value={t.status}
                                                     onChange={(e) => onUpdateStatus(t.id, e.target.value as TransactionStatus)}
-                                                    className={`appearance-none cursor-pointer pl-2 pr-6 py-0.5 rounded-full text-[10px] font-bold border focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-400 ${getStatusColor(t.status)}`}
+                                                    className={`appearance-none cursor-pointer w-full pl-3 pr-8 py-1 rounded-full text-xs font-bold border focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400 transition-colors shadow-sm ${getStatusColor(t.status)}`}
                                                 >
-                                                    <option value="AGUARDANDO">Aguardando</option>
-                                                    <option value="PAGO">Pago</option>
-                                                    <option value="ATRASADO">Atrasado</option>
+                                                    {isEntry ? (
+                                                        <>
+                                                            <option value="AGUARDANDO">Aguardando</option>
+                                                            <option value="PAGO">Pago</option>
+                                                            <option value="ATRASADO">Atrasado</option>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <option value="PENDENTE">Pendente</option>
+                                                            <option value="PAGO">Pago</option>
+                                                            <option value="ATRASADO">Atrasado</option>
+                                                        </>
+                                                    )}
                                                 </select>
-                                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-current opacity-60">
-                                                    <svg className="fill-current h-2 w-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-current opacity-60">
+                                                    <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
                                                 </div>
-                                            </div>
-                                            {title === 'Contas Pendentes' && t.status !== 'PAGO' && (
-                                                <button
-                                                    onClick={() => onUpdateStatus(t.id, 'PAGO')}
-                                                    className="px-2 py-0.5 bg-green-500 hover:bg-green-600 text-white text-[10px] font-bold rounded-full transition-colors shadow-sm flex items-center gap-1"
-                                                    title="Marcar como Pago"
-                                                >
-                                                    <CheckCircle2 size={10} /> Pago
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-                                </td>
-                            </>
-                        ) : (
-                            // Row for Contas a Pagar
-                            <>
-                                <td className="px-3 py-2 whitespace-nowrap text-xs text-slate-400">
-                                    {formatShortDate(t.date)}
-                                </td>
-                                <td className="px-3 py-2 whitespace-nowrap text-sm font-bold text-slate-800">
-                                    {t.entity}
-                                </td>
-                                <td className="px-3 py-2 text-xs text-slate-500 whitespace-normal break-words">
-                                    {t.description}
-                                    {/* Installment Badge */}
-                                    {t.installmentCurrent && t.installmentTotal && (
-                                        <span className="inline-flex items-center gap-0.5 ml-2 px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 font-bold text-[9px] border border-blue-200">
-                                            <Layers size={8} />
-                                            {t.installmentCurrent}/{t.installmentTotal}
-                                        </span>
-                                    )}
-                                </td>
-                                <td className="px-3 py-2 whitespace-nowrap text-sm font-bold text-red-700">
-                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.amount)}
-                                </td>
-                                <td className="px-3 py-2 whitespace-nowrap text-center">
-                                    {readOnly ? (
-                                        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusColor(t.status)}`}>
-                                            {t.status}
-                                        </span>
-                                    ) : (
-                                        <div className="relative inline-block">
-                                            <select 
-                                                value={t.status}
-                                                onChange={(e) => onUpdateStatus(t.id, e.target.value as TransactionStatus)}
-                                                className={`appearance-none cursor-pointer pl-2 pr-6 py-0.5 rounded-full text-[10px] font-bold border focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-400 ${getStatusColor(t.status)}`}
-                                            >
-                                                <option value="PENDENTE">Pendente</option>
-                                                <option value="PAGO">Pago</option>
-                                                <option value="ATRASADO">Atrasado</option>
-                                            </select>
-                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-current opacity-60">
-                                                <svg className="fill-current h-2 w-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                                            </div>
-                                        </div>
-                                    )}
-                                </td>
-                                <td className="px-3 py-2 whitespace-nowrap text-center text-sm text-slate-500">
-                                    <div className="flex items-center justify-center">
-                                        {readOnly ? (
-                                            <span className={`text-xs ${t.paymentDate ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>
-                                                {formatFullDate(t.paymentDate || '')}
-                                            </span>
-                                        ) : (
-                                            <div className={`relative flex items-center justify-center gap-1 px-1 py-1 rounded-lg border transition-all ${t.paymentDate ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-slate-200 bg-white text-slate-400 hover:border-slate-300'}`}>
-                                                <Calendar size={12} className={t.paymentDate ? 'text-blue-600' : 'text-slate-400'} />
-                                                <input 
-                                                    type="date" 
-                                                    value={t.paymentDate || ''}
-                                                    onChange={(e) => handleQuickPaymentDateChange(t, e.target.value)}
-                                                    className="bg-transparent border-none p-0 text-[10px] focus:ring-0 outline-none w-20 text-center font-medium cursor-pointer"
-                                                    style={{ color: 'inherit' }}
-                                                />
                                             </div>
                                         )}
                                     </div>
-                                </td>
-                                <td className="px-3 py-2 whitespace-nowrap text-center">
-                                    {t.payer ? (
-                                        <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-200">
-                                            {t.payer}
-                                        </span>
-                                    ) : '-'}
-                                </td>
-                            </>
-                        )}
-
-                        {/* Actions Column (Shared) */}
-                        {!readOnly && (
-                            <td className="px-3 py-2 whitespace-nowrap text-center">
-                                <div className="flex items-center justify-center gap-1 relative z-10">
-                                    <button 
-                                        type="button"
-                                        className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                                        title="Editar"
-                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleEdit(t); }}
-                                    >
-                                        <Edit size={14} className="pointer-events-none" />
-                                    </button>
-                                    <button 
-                                        type="button"
-                                        onClick={(e) => { 
-                                            e.preventDefault(); 
-                                            e.stopPropagation(); 
-                                            handleDelete(t.id);
-                                        }}
-                                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                        title="Excluir"
-                                    >
-                                        <Trash2 size={14} className="pointer-events-none" />
-                                    </button>
                                 </div>
-                            </td>
-                        )}
-                        </tr>
-                    ))}
-                </React.Fragment>
-              ))}
-              
-              {groupedTransactions.length === 0 && (
-                <tr>
-                  <td colSpan={readOnly ? (isEntry ? 5 : 7) : (isEntry ? 6 : 8)} className="px-6 py-12 text-center text-slate-400">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                        <Calendar size={40} className="opacity-20 mb-2" />
-                        <p className="font-bold">Nenhum lançamento neste mês.</p>
-                        <p className="text-xs">Mude o mês na navegação acima para ver outros registros.</p>
+
+                                {/* Right: Payment Date & Quick Actions */}
+                                <div className="flex items-center justify-between md:justify-end gap-3 mt-3 md:mt-0 pt-3 md:pt-0 border-t md:border-t-0 border-slate-100">
+                                    {!isEntry && (
+                                        <div className="flex flex-col items-start md:items-end mr-2">
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase mb-1">Pagamento</span>
+                                            {readOnly ? (
+                                                <span className={`text-xs font-bold ${t.paymentDate ? 'text-blue-600' : 'text-slate-300'}`}>
+                                                    {t.paymentDate ? formatFullDate(t.paymentDate) : 'Não pago'}
+                                                </span>
+                                            ) : (
+                                                <div className={`relative flex items-center justify-center gap-1.5 px-2 py-1 rounded border transition-all ${t.paymentDate ? 'border-blue-200 bg-blue-50/50 text-blue-700' : 'border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300'}`}>
+                                                    <Calendar size={12} className={t.paymentDate ? 'text-blue-600' : 'text-slate-400'} />
+                                                    <input 
+                                                        type="date" 
+                                                        value={t.paymentDate || ''}
+                                                        onChange={(e) => handleQuickPaymentDateChange(t, e.target.value)}
+                                                        className="bg-transparent border-none p-0 text-[11px] h-4 focus:ring-0 outline-none w-[88px] text-center font-bold cursor-pointer"
+                                                        style={{ color: 'inherit' }}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {!readOnly && (
+                                        <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl group-hover:bg-slate-100 transition-colors">
+                                            <button 
+                                                type="button"
+                                                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-white rounded-lg shadow-sm transition-all"
+                                                title="Editar"
+                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleEdit(t); }}
+                                            >
+                                                <Edit size={16} className="pointer-events-none" />
+                                            </button>
+                                            <button 
+                                                type="button"
+                                                onClick={(e) => { 
+                                                    e.preventDefault(); 
+                                                    e.stopPropagation(); 
+                                                    handleDelete(t.id);
+                                                }}
+                                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-white rounded-lg shadow-sm transition-all"
+                                                title="Excluir"
+                                            >
+                                                <Trash2 size={16} className="pointer-events-none" />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                </div>
+            ))
+          )}
       </div>
     </div>
   );

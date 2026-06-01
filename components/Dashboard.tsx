@@ -1,39 +1,30 @@
 import React, { useMemo, useState } from 'react';
 import { Transaction } from '../types';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, Cell, PieChart, Pie
 } from 'recharts';
-import { Card } from './ui/Card';
-import { Calendar, ChevronDown, TrendingUp, TrendingDown, DollarSign, Wallet } from 'lucide-react';
+import { Calendar, ChevronDown, TrendingUp, TrendingDown, DollarSign, Wallet, Clock, Activity, ArrowUpRight, ArrowDownRight, Layers } from 'lucide-react';
 
 interface DashboardProps {
   transactions: Transaction[];
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
-  // Inicializa com o ano e mês atuais
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
 
-  const months = [
-    'JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'
-  ];
+  const months = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 
-  // Helper para extrair Ano e Mês sem sofrer com Fuso Horário (Timezone)
   const getTransactionDate = (dateStr: string) => {
     try {
         if (!dateStr) return { year: 0, month: -1 };
-        
-        // Se for formato ISO ou YYYY-MM-DD (padrão do input type="date")
         if (dateStr.includes('-')) {
-            const cleanDate = dateStr.split('T')[0]; // Remove hora se houver
+            const cleanDate = dateStr.split('T')[0];
             const parts = cleanDate.split('-');
             const year = parseInt(parts[0], 10);
-            const month = parseInt(parts[1], 10) - 1; // Mês 0-indexado
+            const month = parseInt(parts[1], 10) - 1;
             return { year, month };
         }
-        
-        // Fallback para outros formatos
         const d = new Date(dateStr);
         return { year: d.getFullYear(), month: d.getMonth() };
     } catch (e) {
@@ -41,34 +32,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
     }
   };
 
-  // 1. Calcular o saldo acumulado de todos os anos anteriores ao ano selecionado (CAIXA REALIZADO)
-  // Isso pega todo o histórico até 31/Dez do ano anterior
   const previousBalance = useMemo(() => {
     return transactions.reduce((acc, t) => {
         const { year } = getTransactionDate(t.date);
-        
-        // Soma tudo que é estritamente anterior ao ano selecionado
         if (year < selectedYear) {
             const amount = Number(t.amount) || 0;
             const type = t.type?.toUpperCase();
-            
-            // REGRA DE OURO: Para compor saldo inicial (Caixa), consideramos apenas o que foi CONCRETIZADO (PAGO)
             if (t.status === 'PAGO') {
-                if (type === 'ENTRADA') {
-                    return acc + amount;
-                }
-                if (type === 'SAIDA') {
-                    return acc - amount;
-                }
+                if (type === 'ENTRADA') return acc + amount;
+                if (type === 'SAIDA') return acc - amount;
             }
         }
         return acc;
     }, 0);
   }, [transactions, selectedYear]);
 
-  // Cálculo dos dados anuais (Gráfico e Tabela Inferior)
   const yearlyData = useMemo(() => {
-    // Cria estrutura base zerada para os 12 meses
     const data = Array(12).fill(0).map((_, idx) => ({
       name: months[idx],
       index: idx,
@@ -77,8 +56,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
       Saldo: 0
     }));
 
-    // Injeta o Saldo Anterior em JANEIRO (index 0) se for diferente de zero
-    // Isso cumpre o requisito: "começar com esse valor em Entradas"
     if (previousBalance !== 0) {
         data[0].Entrada += previousBalance;
     }
@@ -89,77 +66,52 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
 
       if (year === selectedYear && month >= 0 && month <= 11) {
           const type = t.type?.toUpperCase();
-          
-          if (type === 'ENTRADA') {
-              // FILTRO: Só soma nas análises se estiver PAGO (Solicitação do usuário)
-              if (t.status === 'PAGO') {
+          if (type === 'ENTRADA' && t.status === 'PAGO') {
                 data[month].Entrada += amount;
-              }
-          } else if (type === 'SAIDA') {
-              // FILTRO: Só soma nas análises se estiver PAGO
-              if (t.status === 'PAGO') {
+          } else if (type === 'SAIDA' && t.status === 'PAGO') {
                 data[month].Saida += amount;
-              }
           }
       }
     });
 
-    // Calcula saldos finais com lógica acumulativa (Carry Over)
-    // O saldo de um mês é somado à Entrada do mês seguinte para manter o fluxo de caixa contínuo
     for (let i = 0; i < 12; i++) {
         if (i > 0) {
-            // Adiciona o saldo do mês anterior à entrada deste mês
             data[i].Entrada += data[i-1].Saldo;
         }
-        // Recalcula o saldo
         data[i].Saldo = data[i].Entrada - data[i].Saida;
     }
 
     return data;
   }, [transactions, selectedYear, previousBalance]);
 
-  // Cálculo dos dados do Mês Selecionado (Resumo Lateral)
   const monthData = useMemo(() => {
     const incomeByCategory: Record<string, number> = {};
     const expenseByCategory: Record<string, number> = {};
     let totalIncome = 0;
     let totalExpense = 0;
-
-    // --- NOVA LÓGICA: SALDO DE CAIXA ACUMULADO ---
-    
-    // 1. Calcular o fluxo de caixa dos meses anteriores DENTRO do ano selecionado
-    // Ex: Se estamos em Março, soma (Jan + Fev)
+    let pendingIncome = 0;
     let currentYearPreviousMonthsBalance = 0;
 
     if (selectedMonth > 0) {
         transactions.forEach(t => {
             const { year, month } = getTransactionDate(t.date);
-            // Considera apenas transações do ano atual ANTERIORES ao mês selecionado e que estão PAGAS
             if (year === selectedYear && month < selectedMonth && t.status === 'PAGO') {
                 const amount = Number(t.amount) || 0;
-                if (t.type === 'ENTRADA') {
-                    currentYearPreviousMonthsBalance += amount;
-                } else if (t.type === 'SAIDA') {
-                    currentYearPreviousMonthsBalance -= amount;
-                }
+                const type = t.type?.toUpperCase();
+                if (type === 'ENTRADA') currentYearPreviousMonthsBalance += amount;
+                else if (type === 'SAIDA') currentYearPreviousMonthsBalance -= amount;
             }
         });
     }
 
-    // 2. Saldo Inicial Total = (Saldo Anos Anteriores) + (Saldo Meses Anteriores do Ano Atual)
     const startingBalance = previousBalance + currentYearPreviousMonthsBalance;
 
-    // 3. Adiciona na lista de Entradas se não for zero
-    // Isso garante que o card de Entradas mostre o dinheiro que "sobrou" antes do mês atual começar
     if (startingBalance !== 0) {
         const label = selectedMonth === 0 ? 'Saldo Ano Anterior' : 'Saldo Mês Anterior';
         incomeByCategory[label] = startingBalance;
         totalIncome += startingBalance;
     }
 
-    // --- FIM NOVA LÓGICA ---
-
-    // Processa transações do mês ATUAL
     transactions.forEach(t => {
        const { year, month } = getTransactionDate(t.date);
        const amount = Number(t.amount) || 0;
@@ -169,13 +121,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
             const category = t.category || 'Geral';
 
             if (type === 'ENTRADA') {
-                // FILTRO: Só soma nas análises se estiver PAGO
                 if (t.status === 'PAGO') {
                     incomeByCategory[category] = (incomeByCategory[category] || 0) + amount;
                     totalIncome += amount;
+                } else {
+                    pendingIncome += amount;
                 }
             } else if (type === 'SAIDA') {
-                // FILTRO: Só soma nas análises se estiver PAGO
                 if (t.status === 'PAGO') {
                     expenseByCategory[category] = (expenseByCategory[category] || 0) + amount;
                     totalExpense += amount;
@@ -184,220 +136,289 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
        }
     });
 
-    return { incomeByCategory, expenseByCategory, totalIncome, totalExpense, startingBalance };
+    return { incomeByCategory, expenseByCategory, totalIncome, totalExpense, startingBalance, pendingIncome };
   }, [transactions, selectedYear, selectedMonth, previousBalance]);
 
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
-  return (
-    <div className="space-y-8 animate-fade-in pb-10">
-      
-      {/* Top Controls Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* Left Side: Selectors & Summaries */}
-        <div className="lg:col-span-3 space-y-6">
-          
-          {/* Selectors - Modern Cards */}
-          <div className="bg-white rounded-2xl shadow-xl p-4 border border-slate-100 flex flex-col gap-3">
-             <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-blue-600">
-                    <Calendar size={18} />
-                </div>
-                <select 
-                  value={selectedYear} 
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="w-full bg-slate-50 text-slate-800 font-bold rounded-xl pl-10 pr-8 py-3 appearance-none border-2 border-transparent focus:border-blue-500 outline-none cursor-pointer transition-colors hover:bg-blue-50"
-                >
-                  {/* Gera lista de anos dinamicamente baseada nos dados ou padrão */}
-                  {[2023, 2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
-                    <ChevronDown size={16} />
-                </div>
-             </div>
+  const totalYearIncome = yearlyData.reduce((acc, curr) => acc + curr.Entrada, 0);
+  const totalYearExpense = yearlyData.reduce((acc, curr) => acc + curr.Saida, 0);
 
+  // Colors for PieChart
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
+
+  const categoryData = Object.entries(monthData.expenseByCategory).map(([name, value], index) => ({
+      name, value, color: COLORS[index % COLORS.length]
+  })).sort((a, b) => b.value - a.value);
+
+  return (
+    <div className="space-y-6 animate-fade-in pb-10 max-w-7xl mx-auto font-sans">
+      
+      {/* Header & Controls */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-slate-200/60">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+             <Activity className="text-blue-600" size={28} />
+             Visão Analítica
+          </h1>
+          <p className="text-sm text-slate-500 mt-1 font-medium">Acompanhe seus resultados e fluxo de caixa.</p>
+        </div>
+
+        <div className="flex items-center gap-3 bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200/60 transition-shadow hover:shadow-md">
              <div className="relative">
                 <select 
                   value={selectedMonth} 
                   onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                  className="w-full bg-blue-600 text-white font-bold rounded-xl pl-4 pr-8 py-3 appearance-none border-none outline-none cursor-pointer shadow-lg shadow-blue-200 hover:bg-blue-700 transition-colors text-center uppercase tracking-wider"
+                  className="appearance-none bg-transparent pl-4 pr-10 py-2.5 font-semibold text-slate-700 outline-none cursor-pointer hover:text-blue-600 transition-colors"
                 >
-                  {months.map((m, i) => <option key={i} value={i} className="text-slate-800 bg-white">{m}</option>)}
+                  {months.map((m, i) => <option key={i} value={i}>{m}</option>)}
                 </select>
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-blue-200">
-                    <ChevronDown size={16} />
-                </div>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
              </div>
-          </div>
-
-          {/* Entradas Summary Table */}
-          <Card className="!p-0 border-none overflow-hidden" headerColor="bg-gradient-to-r from-green-600 to-emerald-500" title="Entradas" centerTitle>
-            <div className="divide-y divide-slate-100 bg-white">
-              <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
-                  {Object.entries(monthData.incomeByCategory).map(([cat, val]) => (
-                    <div key={cat} className={`flex justify-between px-6 py-3 text-sm hover:bg-green-50/50 transition-colors ${cat.includes('Saldo') ? 'bg-yellow-50' : ''}`}>
-                      <span className={`font-semibold truncate mr-2 ${cat.includes('Saldo') ? 'text-yellow-700 flex items-center gap-1' : 'text-slate-600'}`}>
-                        {cat.includes('Saldo') && <Wallet size={12} />}
-                        {cat}
-                      </span>
-                      <span className={`font-bold whitespace-nowrap ${(val as number) < 0 ? 'text-red-600' : 'text-green-700'}`}>
-                        {formatCurrency(val as number)}
-                      </span>
-                    </div>
-                  ))}
-                  {Object.keys(monthData.incomeByCategory).length === 0 && (
-                     <div className="p-6 text-center text-slate-400 text-xs italic">Nenhum recebimento este mês</div>
-                  )}
-              </div>
-              <div className="flex justify-between px-6 py-4 bg-green-50/80 font-black border-t border-green-100 text-green-800">
-                <span>TOTAL</span>
-                <span>{formatCurrency(monthData.totalIncome)}</span>
-              </div>
-            </div>
-          </Card>
-
-           {/* Despesas Summary Table */}
-           <Card className="!p-0 border-none overflow-hidden" headerColor="bg-gradient-to-r from-red-600 to-rose-500" title="Despesas (Pagas)" centerTitle>
-            <div className="divide-y divide-slate-100 bg-white">
-              <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
-                  {Object.entries(monthData.expenseByCategory).map(([cat, val]) => (
-                    <div key={cat} className="flex justify-between px-6 py-3 text-sm hover:bg-red-50/50 transition-colors">
-                      <span className="font-semibold text-slate-600 truncate mr-2">{cat}</span>
-                      <span className="font-bold text-red-700 whitespace-nowrap">{formatCurrency(val as number)}</span>
-                    </div>
-                  ))}
-                   {Object.keys(monthData.expenseByCategory).length === 0 && (
-                     <div className="p-6 text-center text-slate-400 text-xs italic">Nenhuma despesa paga este mês</div>
-                  )}
-              </div>
-              <div className="flex justify-between px-6 py-4 bg-red-50/80 font-black border-t border-red-100 text-red-800">
-                <span>TOTAL</span>
-                <span>{formatCurrency(monthData.totalExpense)}</span>
-              </div>
-            </div>
-          </Card>
-
-        </div>
-
-        {/* Right Side: Chart */}
-        <div className="lg:col-span-9">
-          <Card className="h-full min-h-[450px] relative flex flex-col">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-1.5 h-8 bg-gradient-to-b from-blue-500 to-blue-700 rounded-full"></div>
-                    <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Fluxo Financeiro</h2>
-                        <div className="flex flex-col">
-                            <p className="text-xs text-slate-400 font-medium">Análise de Caixa Realizado (Apenas Pago)</p>
-                            {previousBalance !== 0 && (
-                                <span className={`text-[10px] font-bold flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-full w-fit mt-1 border ${previousBalance > 0 ? 'text-green-600 border-green-100' : 'text-red-500 border-red-100'}`}>
-                                    <Wallet size={10} />
-                                    Saldo Inicial (Ano Anterior): {formatCurrency(previousBalance)}
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                </div>
-                
-                {/* Mini Summary Chips for the Year */}
-                <div className="flex gap-3 text-xs font-bold">
-                    <div className="px-4 py-2 rounded-xl bg-green-50 text-green-700 border border-green-100 flex items-center gap-2">
-                        <TrendingUp size={14} />
-                        {formatCurrency(yearlyData.reduce((acc, curr) => acc + curr.Entrada, 0))}
-                    </div>
-                    <div className="px-4 py-2 rounded-xl bg-red-50 text-red-700 border border-red-100 flex items-center gap-2">
-                        <TrendingDown size={14} />
-                        {formatCurrency(yearlyData.reduce((acc, curr) => acc + curr.Saida, 0))}
-                    </div>
-                     <div className="px-4 py-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 flex items-center gap-2">
-                        {selectedYear}
-                    </div>
-                </div>
-            </div>
-            
-            {/* Added Explicit Height of 400px to fix Recharts rendering issue in some browsers */}
-            <div className="w-full h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={yearlyData} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
-                    <defs>
-                    <linearGradient id="colorEntrada" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#16a34a" stopOpacity={0.6}/>
-                        <stop offset="95%" stopColor="#16a34a" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorSaida" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#dc2626" stopOpacity={0.6}/>
-                        <stop offset="95%" stopColor="#dc2626" stopOpacity={0}/>
-                    </linearGradient>
-                    </defs>
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <Tooltip 
-                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
-                        formatter={(value) => formatCurrency(Number(value))} 
-                        labelStyle={{ color: '#1e293b', fontWeight: 'bold' }}
-                    />
-                    <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }}/>
-                    <Area type="monotone" name="Entradas" dataKey="Entrada" stroke="#16a34a" strokeWidth={3} fillOpacity={1} fill="url(#colorEntrada)" animationDuration={1000} />
-                    <Area type="monotone" name="Despesas (Pagas)" dataKey="Saida" stroke="#dc2626" strokeWidth={3} fillOpacity={1} fill="url(#colorSaida)" animationDuration={1000} />
-                </AreaChart>
-                </ResponsiveContainer>
-            </div>
-          </Card>
+             <div className="w-px h-6 bg-slate-200"></div>
+             <div className="relative">
+                <select 
+                  value={selectedYear} 
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="appearance-none bg-transparent pl-4 pr-10 py-2.5 font-semibold text-slate-700 outline-none cursor-pointer hover:text-blue-600 transition-colors"
+                >
+                  {[2023, 2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+             </div>
         </div>
       </div>
 
-      {/* Bottom Year Table */}
-      <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100 mt-6">
-        <div className="bg-slate-900 px-6 py-4 border-b border-slate-800">
-            <h3 className="text-white font-bold text-lg flex items-center gap-2">
-                <Calendar size={20} className="text-yellow-400" />
-                Resumo Detalhado {selectedYear}
+      {/* Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-500">
+                <TrendingUp size={80} />
+            </div>
+            <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Entradas (Mês)</span>
+                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                        <ArrowUpRight size={20} />
+                    </div>
+                </div>
+                <div>
+                   <h3 className="text-3xl font-black text-slate-900 tracking-tight">{formatCurrency(monthData.totalIncome)}</h3>
+                   {previousBalance !== 0 && (
+                      <p className="text-xs text-slate-400 mt-1 font-medium italic flex items-center gap-1">
+                        *Inclui saldo anterior
+                      </p>
+                   )}
+                </div>
+            </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-500">
+                <TrendingDown size={80} />
+            </div>
+            <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Saídas (Mês)</span>
+                    <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-600">
+                        <ArrowDownRight size={20} />
+                    </div>
+                </div>
+                <div>
+                   <h3 className="text-3xl font-black text-slate-900 tracking-tight">{formatCurrency(monthData.totalExpense)}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div className="bg-slate-900 p-6 rounded-3xl shadow-xl border border-slate-800 relative overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 to-transparent"></div>
+            <div className="absolute top-0 right-0 p-6 opacity-10 text-blue-400 group-hover:scale-110 transition-transform duration-500">
+                <Wallet size={80} />
+            </div>
+            <div className="flex flex-col gap-4 relative z-10">
+                <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-300 uppercase tracking-wider">Saldo Mensal Total</span>
+                    <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-blue-400 border border-slate-700">
+                        <DollarSign size={20} />
+                    </div>
+                </div>
+                <div>
+                   <h3 className="text-3xl font-black text-white tracking-tight">{formatCurrency(monthData.totalIncome - monthData.totalExpense)}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Aguardando Recebimento</span>
+                    <div className="w-10 h-10 rounded-full bg-yellow-50 flex items-center justify-center text-yellow-600">
+                        <Clock size={20} />
+                    </div>
+                </div>
+                <div>
+                   <h3 className="text-3xl font-black text-slate-900 tracking-tight">{formatCurrency(monthData.pendingIncome)}</h3>
+                   <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                       <div className="bg-yellow-400 h-full rounded-full w-1/3 animate-pulse"></div>
+                   </div>
+                </div>
+            </div>
+        </div>
+      </div>
+
+      {/* Main Charts & Breakdown */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Big Area Chart */}
+        <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-100 p-6 sm:p-8">
+            <div className="flex items-center justify-between mb-8">
+                <div>
+                    <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <Layers className="text-blue-600" size={20} /> Fluxo Anual
+                    </h3>
+                    <p className="text-sm font-medium text-slate-500 mt-1">Evolução de entradas e despesas ao longo do ano.</p>
+                </div>
+            </div>
+            <div className="h-[350px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={yearlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <defs>
+                            <linearGradient id="colorIn" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                            </linearGradient>
+                            <linearGradient id="colorOut" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+                                <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                            </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12, fontWeight: 600}} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12, fontWeight: 600}} tickFormatter={(value) => `R$ ${value >= 1000 ? (value/1000).toFixed(0) + 'k' : value}`} />
+                        <Tooltip 
+                            contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)', fontWeight: 'bold', padding: '12px 16px' }}
+                            formatter={(value) => formatCurrency(Number(value))}
+                        />
+                        <Area type="monotone" name="Entradas" dataKey="Entrada" stroke="#3b82f6" strokeWidth={4} fill="url(#colorIn)" activeDot={{ r: 6, strokeWidth: 0 }} />
+                        <Area type="monotone" name="Saídas" dataKey="Saida" stroke="#ef4444" strokeWidth={4} fill="url(#colorOut)" activeDot={{ r: 6, strokeWidth: 0 }} />
+                    </AreaChart>
+                </ResponsiveContainer>
+            </div>
+        </div>
+
+        {/* Categories / Breakdown */}
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 sm:p-8 flex flex-col">
+            <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+                Despesas Mensais
+            </h3>
+            
+            {categoryData.length > 0 ? (
+                <div className="flex-1 flex flex-col items-center">
+                    <div className="h-[200px] w-full mt-2">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={categoryData}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={70}
+                                    outerRadius={90}
+                                    paddingAngle={5}
+                                    dataKey="value"
+                                    stroke="none"
+                                >
+                                    {categoryData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Pie>
+                                <Tooltip formatter={(value) => formatCurrency(Number(value))} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontWeight: 'bold' }} />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                    
+                    <div className="w-full mt-8 space-y-4 max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
+                        {categoryData.map((cat, idx) => (
+                            <div key={idx} className="flex items-center justify-between w-full">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-3.5 h-3.5 rounded-full shadow-sm" style={{ backgroundColor: cat.color }}></div>
+                                    <span className="text-sm font-semibold text-slate-700 truncate max-w-[120px]">{cat.name}</span>
+                                </div>
+                                <span className="text-sm font-extrabold text-slate-900">{formatCurrency(cat.value)}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : (
+                <div className="flex-1 flex items-center justify-center flex-col text-slate-400">
+                    <div className="w-24 h-24 rounded-full bg-slate-50 flex items-center justify-center mb-4">
+                        <TrendingDown size={32} className="text-slate-300" />
+                    </div>
+                    <p className="font-medium text-sm">Nenhuma despesa no mês</p>
+                </div>
+            )}
+        </div>
+      </div>
+
+      {/* Year Resumo Table */}
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="px-6 sm:px-8 py-6 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                Resumo de Caixa Anual Consolidado
             </h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-100">
+          <table className="min-w-full text-left">
             <thead>
-              <tr className="bg-slate-50">
-                <th className="py-4 pl-6 pr-3 text-left text-xs font-extrabold text-slate-500 uppercase tracking-wider">Categoria</th>
+              <tr className="bg-slate-50/50 text-slate-500 uppercase font-extrabold text-xs tracking-wider">
+                <th className="py-4 px-6 sm:px-8 rounded-tl-xl border-b border-slate-200">Visão Geral</th>
                 {months.map(m => (
-                  <th key={m} className="px-2 py-4 text-center text-xs font-extrabold text-slate-500 uppercase">{m}</th>
+                  <th key={m} className="px-3 py-4 text-center border-b border-slate-200">{m}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-slate-50">
-              <tr className="hover:bg-green-50/30 transition-colors">
-                <td className="py-4 pl-6 pr-3 text-sm font-bold text-green-700 uppercase flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500"></div> Entradas
+            <tbody className="divide-y divide-slate-100">
+              <tr className="group hover:bg-slate-50 transition-colors">
+                <td className="py-5 px-6 sm:px-8">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                            <ArrowUpRight size={16} />
+                        </div>
+                        <span className="font-bold text-slate-800 text-sm">Entradas Totais</span>
+                    </div>
                 </td>
                 {yearlyData.map((d, i) => (
-                  <td key={d.name} className="px-2 py-4 text-xs text-center text-slate-600 font-medium relative group">
-                      {d.Entrada !== 0 ? formatCurrency(d.Entrada) : '-'}
-                      {/* Tooltip para mostrar quanto é do saldo anterior em Janeiro */}
-                      {i === 0 && previousBalance !== 0 && (
-                          <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-[10px] p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                              Inclui {formatCurrency(previousBalance)} (Ano Anterior)
-                          </div>
-                      )}
+                  <td key={d.name} className="px-3 py-4 text-xs text-center font-bold text-slate-600">
+                      {d.Entrada !== 0 ? formatCurrency(d.Entrada) : <span className="text-slate-300">-</span>}
                   </td>
                 ))}
               </tr>
-              <tr className="hover:bg-red-50/30 transition-colors">
-                <td className="py-4 pl-6 pr-3 text-sm font-bold text-red-700 uppercase flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-red-500"></div> Despesas
+              <tr className="group hover:bg-slate-50 transition-colors">
+                <td className="py-5 px-6 sm:px-8">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center text-red-600">
+                            <ArrowDownRight size={16} />
+                        </div>
+                        <span className="font-bold text-slate-800 text-sm">Despesas Totais</span>
+                    </div>
                 </td>
                 {yearlyData.map(d => (
-                  <td key={d.name} className="px-2 py-4 text-xs text-center text-slate-600 font-medium">{d.Saida > 0 ? formatCurrency(d.Saida) : '-'}</td>
+                  <td key={d.name} className="px-3 py-4 text-xs text-center font-bold text-slate-600">
+                      {d.Saida > 0 ? formatCurrency(d.Saida) : <span className="text-slate-300">-</span>}
+                  </td>
                 ))}
               </tr>
-              <tr className="bg-slate-50/50">
-                <td className="py-4 pl-6 pr-3 text-sm font-black text-slate-800 uppercase flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-blue-600"></div> Saldo
+              <tr className="bg-slate-50 font-black">
+                <td className="py-5 px-6 sm:px-8">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-white shadow-md">
+                            <DollarSign size={16} />
+                        </div>
+                        <span className="text-slate-900 text-sm">Saldo Financeiro Final</span>
+                    </div>
                 </td>
                 {yearlyData.map(d => (
-                  <td key={d.name} className={`px-2 py-4 text-xs text-center font-bold ${d.Saldo >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                  <td key={d.name} className={`px-3 py-4 text-xs text-center font-black ${d.Saldo >= 0 ? 'text-blue-600' : 'text-red-500'}`}>
                    {d.Saldo !== 0 ? formatCurrency(d.Saldo) : '-'}
                 </td>
                 ))}

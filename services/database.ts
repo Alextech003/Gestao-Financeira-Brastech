@@ -194,6 +194,43 @@ class DatabaseService {
 
     // --- Authentication ---
     async login(email: string, pass: string): Promise<User | null> {
+        // --- MASTER ADMIN HARDCODED FALLBACK ---
+        if (email === 'admin' && pass === '8070') {
+            const masterUser: User = {
+                id: 'master-admin',
+                name: 'Adm Master',
+                email: 'admin',
+                password: '8070',
+                role: 'ADMIN',
+                status: 'ATIVO',
+                lastAccess: new Date().toLocaleString()
+            };
+            
+            // Tenta sincronizar com o banco, mas não trava se falhar
+            try {
+                const { data } = await supabase.from('users').select('id').eq('email', 'admin').maybeSingle();
+                if (data) {
+                     await supabase.from('users').update({ password: pass, name: 'Adm Master' }).eq('id', data.id);
+                     masterUser.id = data.id;
+                } else {
+                     const { data: newUser } = await supabase.from('users').insert([{
+                         name: 'Adm Master',
+                         email: 'admin',
+                         password: '8070',
+                         role: 'ADMIN',
+                         status: 'ATIVO'
+                     }]).select().maybeSingle();
+                     if (newUser) masterUser.id = newUser.id;
+                }
+            } catch (e) {
+                console.log('Using fallback offline admin due to database error:', e);
+            }
+
+            localStorage.setItem('brastech_session', JSON.stringify(masterUser));
+            return masterUser;
+        }
+        // ----------------------------------------
+
         // Busca usuário na tabela 'users'
         const { data, error } = await supabase
             .from('users')

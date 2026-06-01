@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { Dashboard } from './components/Dashboard';
 import { TransactionList } from './components/TransactionList';
-import { ClientList } from './components/ClientList';
 import { UserList } from './components/UserList';
 import { GeminiEditor } from './components/GeminiEditor';
 import { Login } from './components/Login'; 
@@ -233,26 +232,11 @@ function App() {
         {activeTab === 'receivables' && (
           <TransactionList 
             type="ENTRADA" 
+            statusFilter={['PAGO', 'PENDENTE', 'AGUARDANDO', 'ATRASADO']}
+            defaultStatus="PAGO"
             title="Entradas"
-            subtitle="Histórico de todos os recebimentos."
+            subtitle="Gestão inteligente de recebimentos e fluxo de entrada."
             buttonLabel="Nova Entrada"
-            transactions={transactions} 
-            onAddTransaction={addTransaction} 
-            onUpdateTransaction={updateTransaction}
-            onUpdateStatus={updateStatus}
-            onDelete={deleteTransaction}
-            readOnly={activeUser.role === 'VIEWER'}
-          />
-        )}
-
-        {activeTab === 'pendentes' && (
-          <TransactionList 
-            type="ENTRADA" 
-            statusFilter={['PENDENTE', 'AGUARDANDO', 'ATRASADO']}
-            defaultStatus="AGUARDANDO"
-            title="Contas Pendentes"
-            subtitle="Dívidas e valores a receber. Ao marcar como Pago, vai para Entradas."
-            buttonLabel="Novo a Receber"
             transactions={transactions} 
             onAddTransaction={addTransaction} 
             onUpdateTransaction={updateTransaction}
@@ -265,6 +249,11 @@ function App() {
         {activeTab === 'payables' && (
           <TransactionList 
             type="SAIDA" 
+            statusFilter={['PAGO', 'PENDENTE', 'AGUARDANDO', 'ATRASADO']}
+            defaultStatus="PAGO"
+            title="Saídas"
+            subtitle="Gestão inteligente de pagamentos e fluxo de saída."
+            buttonLabel="Nova Saída"
             transactions={transactions} 
             onAddTransaction={addTransaction} 
             onUpdateTransaction={updateTransaction}
@@ -272,16 +261,6 @@ function App() {
             onDelete={deleteTransaction}
             readOnly={activeUser.role === 'VIEWER'}
           />
-        )}
-
-        {activeTab === 'clients' && (
-           <ClientList 
-             clients={clients}
-             onAddClient={addClient}
-             onUpdateClient={updateClient}
-             onDeleteClient={deleteClient}
-             readOnly={activeUser.role === 'VIEWER'}
-           />
         )}
 
         {/* Proteção adicional de renderização */}
