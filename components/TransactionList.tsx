@@ -106,16 +106,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({
       }, 0);
   }, [groupedTransactions]);
 
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Installment State
-  const [isInstallment, setIsInstallment] = useState(false);
-  const [installmentsCount, setInstallmentsCount] = useState<number>(2);
-
-  const isEntry = type === 'ENTRADA';
-  
   // Helper para obter data local YYYY-MM-DD
   const getLocalToday = () => {
     const d = new Date();
@@ -125,6 +115,21 @@ export const TransactionList: React.FC<TransactionListProps> = ({
       String(d.getDate()).padStart(2, '0')
     ].join('-');
   };
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Installment State
+  const [isInstallment, setIsInstallment] = useState(false);
+  const [installmentsCount, setInstallmentsCount] = useState<number>(2);
+
+  // Refund / Receive Loan State
+  const [generateRefund, setGenerateRefund] = useState(false);
+  const [refundDate, setRefundDate] = useState(getLocalToday());
+  const [refundInstallments, setRefundInstallments] = useState(1);
+
+  const isEntry = type === 'ENTRADA';
 
   // New transaction state
   const [newTrans, setNewTrans] = useState<Partial<Transaction>>({
@@ -162,6 +167,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     setIsInstallment(false);
     setInstallmentsCount(2);
     setIsSubmitting(false);
+    setGenerateRefund(false);
+    setRefundDate(getLocalToday());
+    setRefundInstallments(1);
     setNewTrans({
       date: getLocalToday(),
       description: '',
@@ -279,45 +287,66 @@ export const TransactionList: React.FC<TransactionListProps> = ({
             // Edição de item único
             await onUpdateTransaction({ ...baseData, date: newTrans.date!, amount: finalAmount, id: editingId });
         } else {
-            // Nova Transação (Verificar Parcelamento)
+            // Nova Transação
+            const transactionsBatch: Omit<Transaction, 'id'>[] = [];
+
             if (isInstallment && installmentsCount > 1 && !isEntry) {
-                // Lógica de cálculo preciso para evitar dízimas (ex: 100/3)
                 const total = finalAmount;
                 const count = installmentsCount;
                 
-                // Valor base arredondado para baixo (2 casas)
                 const baseValue = Math.floor((total / count) * 100) / 100;
-                
-                // O resto (centavos) vai para a primeira parcela
                 const remainder = Number((total - (baseValue * count)).toFixed(2));
                 
-                const transactionsBatch: Omit<Transaction, 'id'>[] = [];
-
-                // Loop para criar parcelas
                 for (let i = 0; i < count; i++) {
                     const currentDate = addMonths(newTrans.date!, i);
-                    
-                    // Soma o resto na primeira parcela
                     const installmentValue = i === 0 ? baseValue + remainder : baseValue;
                     
                     transactionsBatch.push({
                         ...baseData,
                         date: currentDate,
                         amount: installmentValue,
-                        // ADICIONA NÚMERO DA PARCELA NA DESCRIÇÃO (Já que o banco não tem coluna própria)
                         description: `${baseData.description} (${i + 1}/${count})`,
-                        installmentCurrent: i + 1, // Mantém para UI local (mas será removido ao enviar pro banco)
+                        installmentCurrent: i + 1,
                         installmentTotal: count,
-                        status: i === 0 ? baseData.status : 'PENDENTE' // Apenas a primeira herda o status do form se for pago
+                        status: i === 0 ? baseData.status : 'PENDENTE'
                     });
                 }
-                
-                // Envia todas juntas (Bulk Insert)
-                await onAddTransaction(transactionsBatch);
-
             } else {
-                // Transação única normal
-                await onAddTransaction({ ...baseData, date: newTrans.date!, amount: finalAmount });
+                transactionsBatch.push({ ...baseData, date: newTrans.date!, amount: finalAmount });
+            }
+
+            // Refund logic
+            if (!isEntry && generateRefund) {
+                const total = finalAmount;
+                const count = refundInstallments;
+                
+                const baseValue = Math.floor((total / count) * 100) / 100;
+                const remainder = Number((total - (baseValue * count)).toFixed(2));
+
+                for (let i = 0; i < count; i++) {
+                    const currentDate = addMonths(refundDate, i);
+                    const installmentValue = i === 0 ? baseValue + remainder : baseValue;
+                    
+                    transactionsBatch.push({
+                        description: `${baseData.description} (Devolução${count > 1 ? ` ${i + 1}/${count}` : ''})`,
+                        entity: baseData.entity,
+                        category: baseData.category,
+                        status: 'AGUARDANDO',
+                        type: 'ENTRADA',
+                        date: currentDate,
+                        amount: installmentValue,
+                        payer: baseData.payer,
+                        installmentCurrent: count > 1 ? i + 1 : undefined,
+                        installmentTotal: count > 1 ? count : undefined,
+                        paymentDate: ''
+                    });
+                }
+            }
+            
+            if (transactionsBatch.length === 1) {
+                await onAddTransaction(transactionsBatch[0]);
+            } else if (transactionsBatch.length > 1) {
+                await onAddTransaction(transactionsBatch);
             }
         }
         resetForm();
@@ -624,6 +653,53 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                                             <span className="text-xs text-slate-400 ml-2">
                                                 {newTrans.amount ? `(${installmentsCount}x de ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(newTrans.amount) / installmentsCount)})` : ''}
                                             </span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Loan Refund Toggle for Expenses */}
+                            {!editingId && !isEntry && (
+                                <div className="lg:col-span-12 bg-blue-50/50 p-4 rounded-xl border border-blue-100 mt-2 flex flex-col gap-4">
+                                    <label className="flex items-center cursor-pointer gap-2 w-max">
+                                        <input 
+                                            type="checkbox" 
+                                            className="w-5 h-5 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                                            checked={generateRefund}
+                                            onChange={(e) => setGenerateRefund(e.target.checked)}
+                                        />
+                                        <span className="font-bold text-blue-800 flex items-center gap-2">
+                                            <ArrowUpCircle size={18} className="text-blue-600" />
+                                            Gerar cobrança nas Entradas (Empréstimo/Reembolso)?
+                                        </span>
+                                    </label>
+
+                                    {generateRefund && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-7 animate-in fade-in slide-in-from-top-2">
+                                            <div className="group">
+                                                <label className="flex items-center gap-2 text-xs font-bold text-blue-700 mb-2 uppercase tracking-wide">
+                                                    <Calendar size={14} /> Data do 1º Pagamento
+                                                </label>
+                                                <input 
+                                                    type="date" 
+                                                    className="w-full bg-white border border-blue-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500" 
+                                                    value={refundDate} 
+                                                    onChange={e => setRefundDate(e.target.value)} 
+                                                />
+                                            </div>
+                                            <div className="group">
+                                                <label className="flex items-center gap-2 text-xs font-bold text-blue-700 mb-2 uppercase tracking-wide">
+                                                    <Layers size={14} /> Receber em quantas parcelas?
+                                                </label>
+                                                <input 
+                                                    type="number" 
+                                                    min="1" 
+                                                    max="36" 
+                                                    className="w-full bg-white border border-blue-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500" 
+                                                    value={refundInstallments} 
+                                                    onChange={e => setRefundInstallments(Math.max(1, parseInt(e.target.value) || 1))} 
+                                                />
+                                            </div>
                                         </div>
                                     )}
                                 </div>
